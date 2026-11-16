@@ -4315,7 +4315,7 @@ html:root[data-cast] {
 .chore-repeat-interval select { flex: 1; min-width: 0; }
 .chore-repeat-interval .repeat-unit { flex: 1; min-width: 0; align-self: center; font-weight: 700; }
 /* The event sheet's repeat in one sentence, and its "just this one or every one" question. */
-.repeat-summary { font-weight: 700; color: var(--text); }
+.repeat-summary { font-weight: 700; color: var(--text); margin-bottom: 14px; }
 .repeat-scope-ask { margin: 0 0 12px; padding: 12px; border-radius: var(--radius-sm, 10px); background: var(--bg-alt); font-weight: 700; }
 
 .chore-card-goal-met { cursor: default; }
