@@ -608,7 +608,7 @@ export const api = {
   createEvent: (body: Partial<EventInstance>) => MOCK ? mock.createEvent(body) : post<EventInstance>('api/events', body),
   updateEvent: (id: string, body: Partial<EventInstance> & { scope?: 'occurrence' | 'series' }) =>
     MOCK ? mock.updateEvent(id, body) : patch<EventInstance>(`api/events/${id}`, body),
-  deleteEvent: (id: string) => MOCK ? mock.deleteEvent(id) : del(`api/events/${id}`),
+  deleteEvent: (id: string, scope?: 'occurrence' | 'series') => MOCK ? mock.deleteEvent(id) : del(`api/events/${id}` + (scope ? `?${new URLSearchParams({ scope })}` : '')),
   // Hiding events (parents' devices): just this one or its whole series; Show again from the event or the calendar's list.
   hideEvent: (id: string, scope: 'occurrence' | 'series', occurrenceStart?: string | null) =>
     MOCK ? mock.hideEvent(id, scope, occurrenceStart) : put<HiddenEvent>(`api/events/${encodeURIComponent(id)}/hidden`, { scope, occurrenceStart: occurrenceStart ?? undefined }),

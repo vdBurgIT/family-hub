@@ -36,7 +36,9 @@ import { PriorityBadge } from './PriorityBadge.tsx'
 import { isSingleEmoji } from './emoji.ts'
 import { calendarGoal } from './tempCheck.ts'
 import { leadBy, leadIcon, leadOf, leadText } from './leadTime.ts'
-import { dedupeEvents, eventPeople, gridTop, hourPx, isTimedOnDate, layoutDay, newEventDay, newEventStart, repeatChoice, repeatRule, wallHourPx, type RepeatChoice } from './dayLayout.ts'
+import { dedupeEvents, eventPeople, gridTop, hourPx, isTimedOnDate, layoutDay, newEventDay, newEventStart, wallHourPx } from './dayLayout.ts'
+import { buildRepeat, parseRepeat, repeatSummary, validRepeat } from './eventRepeat.ts'
+import { RepeatFields, type RepeatState } from './RepeatFields.tsx'
 import NewscastView from './Newscast.tsx'
 import { CALENDAR_VIEWS, HOME_VIEWS, dayOrigin, isCalendarView, isHomeView, lastCalendarView, linkedCalendarView, monthDayLabel, rememberCalendarView, viewHint, viewLabel, type CalendarView, type ViewMode } from './calendarViews.ts'
 import { onDayChange, onMinute, rollToToday } from './minuteTick.ts'
@@ -376,14 +378,15 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
   const openDay = (d: Date) => { setDayFrom(dayOrigin(viewMode)); setAnchor(d); setViewMode('day'); requestAnimationFrame(() => periodRef.current?.focus()) }
   const openEdit = (ev: EventInstance) => { setDetail(null); setEditState({ event: ev }) }
 
-  const saveEvent = async (body: Partial<EventInstance>, id: string | null, seriesCategory?: { categoryId: string | null; scope: 'occurrence' | 'series' }) => {
+  const saveEvent = async (body: Partial<EventInstance> & { scope?: 'occurrence' | 'series' }, id: string | null, seriesCategory?: { categoryId: string | null; scope: 'occurrence' | 'series' }) => {
     try {
       if (body.calendarId === NEW_LOCAL_CALENDAR) {
         const cal = await api.createCalendar({ kind: 'local', name: 'Kinwall', color: '#F2A27A' })
         setCalendars(cs => [...cs, cal])
         body = { ...body, calendarId: cal.id }
       }
-      const saved = id ? await api.updateEvent(id, body) : await api.createEvent(body)
+      const { scope, ...fields } = body
+      const saved = id ? await api.updateEvent(id, scope ? { ...fields, scope } : fields) : await api.createEvent(fields)
       if (id && seriesCategory) await api.updateEvent(id, seriesCategory)
       setEditState(null)
       reloadCore()
@@ -443,13 +446,18 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
     }
   }
 
-  const deleteEvent = async ({ id, title }: EventInstance) => {
-    if (!await dialog.confirm({ title: t('Delete “{title}”?', { title }), body: t('If it came from Google or Outlook it is deleted there too.'), confirmLabel: t('Delete'), danger: true })) return
+  // A repeating iCloud (CalDAV) event asks which: just this one, or the whole series (the sheet below).
+  const [deleteChoice, setDeleteChoice] = useState<EventInstance | null>(null)
+  const deleteEvent = async (ev: EventInstance, scope?: 'occurrence' | 'series') => {
+    const { id, title } = ev
+    if (!scope && ev.seriesId && calendars.find(c => c.id === ev.calendarId)?.kind === 'caldav') { setDeleteChoice(ev); return }
+    if (!scope && !await dialog.confirm({ title: t('Delete “{title}”?', { title }), body: t('If it came from Google or Outlook it is deleted there too.'), confirmLabel: t('Delete'), danger: true })) return
+    setDeleteChoice(null)
     try {
-      await api.deleteEvent(id)
+      await api.deleteEvent(id, scope)
       setDetail(null)
-      setEvents(evs => evs.filter(e => e.id !== id))
-      toast(t('Event deleted'))
+      setEvents(evs => evs.filter(e => scope === 'series' && ev.seriesId ? !(e.calendarId === ev.calendarId && e.seriesId === ev.seriesId) : e.id !== id))
+      toast(scope === 'series' ? t('Deleted: every {title}', { title }) : t('Event deleted'))
     } catch (e) {
       toast(e instanceof ApiError ? e.message : t('Could not delete event'), true)
     }
@@ -648,6 +656,15 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
           onClose={() => setEditState(null)}
           onSave={saveEvent}
         />
+      )}
+      {deleteChoice && (
+        <Sheet title={t('Delete “{title}”?', { title: deleteChoice.title })} onClose={() => setDeleteChoice(null)}
+          actions={<>
+            <button className="btn btn-danger" onClick={() => void deleteEvent(deleteChoice, 'occurrence')}>{t('Just this one')}</button>
+            <button className="btn btn-danger" onClick={() => void deleteEvent(deleteChoice, 'series')}>{t('Every one in the series')}</button>
+          </>}>
+          <p>{t('This event repeats. It is deleted from the calendar it came from too.')}</p>
+        </Sheet>
       )}
       {checkInMember && <SnapshotSheet member={checkInMember} toCheckIn={morningCheckIn ? 'morning' : true} onClose={() => setCheckIn(null)} />}
     </div>
@@ -1076,11 +1093,14 @@ function EventDetailSheet({ event, members, categories, calendars, canEdit, tz, 
             </div>
           )
         })()}
-        {event.rrule && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-dim)', fontWeight: 700 }}>
-            <RepeatIcon width={18} height={18} />{t('Repeats')}
-          </div>
-        )}
+        {(event.rrule || event.seriesRrule) && (() => {
+          const day = event.allDay ? event.start.slice(0, 10) : zonedDayKey(event.start, tz)
+          return (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-dim)', fontWeight: 700 }}>
+              <RepeatIcon width={18} height={18} style={{ flexShrink: 0 }} />{repeatSummary(parseRepeat(event.rrule ?? event.seriesRrule, day, tz), day) || t('Repeats')}
+            </div>
+          )
+        })()}
         {calendarEntry && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-dim)', fontWeight: 700 }}>
             <CalendarIcon width={18} height={18} style={{ flexShrink: 0 }} />{calendarEntry.name}
@@ -1333,7 +1353,7 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
   shared?: OutingExtras
   members: { id: string; name: string; color: string; avatar: string }[]; categories: Category[]
   onClose: () => void
-  onSave: (body: Partial<EventInstance>, id: string | null, seriesCategory?: { categoryId: string | null; scope: 'occurrence' | 'series' }) => void
+  onSave: (body: Partial<EventInstance> & { scope?: 'occurrence' | 'series' }, id: string | null, seriesCategory?: { categoryId: string | null; scope: 'occurrence' | 'series' }) => void
 }) {
   const writable = calendars // already just the ones this device may add to (writable, on, and allowed)
   const base = event ?? prefill ?? {}
@@ -1361,8 +1381,6 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
   // Notes are plain text; a provider's HTML (from before the server stored it as text) shows as text too.
   const initialNotes = base.description ? stripHtmlToText(base.description).trim() : ''
   const [notes, setNotes] = useState(initialNotes)
-  const initialRepeat = repeatChoice(base.rrule)
-  const [rrule, setRrule] = useState(initialRepeat)
   // reminderSource says whether the reminders are the event's own or the default. The event's own
   // ones pre-select a matching preset, or show as "keep" when they don't fit one (e.g. 10 min + 1 day
   // from Google); no reminders on an existing event means they were turned off.
@@ -1389,6 +1407,21 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
   // The end follows the start (eventEnd.ts): the default length until someone picks an end (an
   // existing event's, or a link's, counts), then the length they picked.
   const [endPicked, setEndPicked] = useState(!!base.end)
+  // Repeat: a Kinwall calendar's own rule, or the series rule of an iCloud (CalDAV) occurrence.
+  // Google and Outlook don't take a repeat from Kinwall, so they don't offer one. An untouched rule
+  // goes back as it came; a touched one is rebuilt from the start date.
+  const sheetTz = useApp().settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  const initialRule = base.rrule ?? base.seriesRrule ?? null
+  const initialDay = format(seedStart, 'yyyy-MM-dd')
+  const [repeat, setRepeat] = useState<RepeatState>(() => ({ ...parseRepeat(initialRule, initialDay, sheetTz), touched: false }))
+  const repeatable = calKind === 'local' || calKind === 'caldav'
+  const ruleOut = repeat.touched ? buildRepeat(repeat.form, startDate, allDay) : initialRule
+  const ruleChanged = repeat.touched && ruleOut !== initialRule
+  const repeatInvalid = repeatable && repeat.touched && !validRepeat(repeat.form, startDate)
+  const repeatText = repeatable ? repeatSummary(repeat, repeat.touched ? startDate : initialDay) : ''
+  // An occurrence of a repeating iCloud event: saving asks "just this one" or "every one" (askScope).
+  const caldavSeries = !!event?.seriesId && calKind === 'caldav'
+  const [askScope, setAskScope] = useState(false)
   const moveStart = (date: string, time: string) => {
     if (allDay) { if (date > endDate) setEndDate(date) } // all day: just never let the range invert
     else {
@@ -1420,13 +1453,10 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
     } catch (e) { toast(e instanceof Error ? e.message : t('Could not save to Outings.'), true) } finally { setSavingOuting(false) }
   }
 
-  const submit = () => {
+  const submit = (scope?: 'occurrence' | 'series') => {
     if (!title.trim()) { setNoTitle(true); titleInput.current?.focus(); return }
     if (!calendarId) return
-    // The menu only knows plain daily/weekly/monthly/yearly: an untouched menu keeps the real rule
-    // (e.g. FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR) instead of flattening it.
-    const rruleStr = rrule === initialRepeat && base.rrule ? base.rrule : repeatRule(rrule)
-    if (endBeforeStart) return
+    if (endBeforeStart || repeatInvalid) return
     let start: string, end: string
     if (allDay) {
       start = startDate
@@ -1438,7 +1468,10 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
     // Server's EventInput.location is string|undefined (not nullable) — send undefined, not null, when empty.
     // Only send categoryId when it changed, so saving an unrelated edit never pins the auto category.
     // On a series it goes as its own scoped PATCH, leaving the rest of the edit on this occurrence.
-    const body: Partial<EventInstance> = { title: title.trim(), calendarId, location: location.trim() || undefined, rrule: rruleStr }
+    const body: Partial<EventInstance> = { title: title.trim(), calendarId, location: location.trim() || undefined }
+    // A Kinwall calendar keeps its rule on the event (sent as before); iCloud gets one only when it's new or changed.
+    if (calKind === 'local') body.rrule = ruleOut
+    else if (calKind === 'caldav' && (event ? ruleChanged : ruleOut)) body.rrule = ruleOut
     // Only send people when they changed: re-sending the inherited list would pin it as a per-event
     // tag, so "From the calendar" events stopped following the calendar after any unrelated edit.
     const initialMembers = base.memberIds ?? []
@@ -1463,15 +1496,23 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
     // Only when changed (new events: when there are any), so other edits never rewrite a synced
     // event's notes and its formatting there. '' clears them.
     if (event ? notes.trim() !== initialNotes : notes.trim()) body.description = notes.trim()
-    onSave(body, event?.id ?? null, categoryChanged && inSeries ? { categoryId, scope: categoryScope } : undefined)
+    const seriesCategory = categoryChanged && inSeries ? { categoryId, scope: categoryScope } : undefined
+    // A new repeat belongs to the whole series; anything else asks.
+    if (caldavSeries && ruleChanged) onSave({ ...body, scope: 'series' }, event!.id, seriesCategory)
+    else if (caldavSeries && !scope) setAskScope(true)
+    else onSave(scope ? { ...body, scope } : body, event?.id ?? null, seriesCategory)
   }
 
   return (
     <Sheet title={event ? t('Edit event') : t('New event')} onClose={onClose} dirty="auto"
-      actions={<>
+      actions={askScope ? <>
+        <button className="btn btn-secondary" onClick={() => submit('occurrence')}>{t('Just this one')}</button>
+        <button className="btn btn-primary" onClick={() => submit('series')}>{t('This and every one in the series')}</button>
+      </> : <>
         {shared && outingsOn && <button className="btn btn-secondary" onClick={() => void saveToOutings()} disabled={endBeforeStart || !title.trim() || savingOuting}>🎟 {t('Save to Outings')}</button>}
-        <button className="btn btn-primary btn-block" onClick={submit} disabled={endBeforeStart}>{event ? t('Save') : t('Add event')}</button>
+        <button className="btn btn-primary btn-block" onClick={() => submit()} disabled={endBeforeStart || repeatInvalid}>{event ? t('Save') : t('Add event')}</button>
       </>}>
+      {askScope && <p className="repeat-scope-ask" role="status">{t('This event repeats. Save the change for just this one, or for this and every one in the series?')}</p>}
       <div className="field">
         <label htmlFor="event-title">{t('Title')}</label>
         <input id="event-title" ref={titleInput} type="text" value={title} onChange={e => { setTitle(e.target.value); setNoTitle(false) }} placeholder={t('Event title')} autoFocus={!event} /* new events only: on a phone, opening Edit shouldn't throw up the keyboard */
@@ -1535,7 +1576,7 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
       </div>
       {/* Most events need only a title, a time and who: the rest folds away, saying what's set. */}
       <details className="settings-disclosure event-more">
-        <summary>{[t('More options'), rrule && { daily: t('Repeats daily'), weekly: t('Repeats weekly'), monthly: t('Repeats monthly'), yearly: t('Repeats yearly') }[rrule], !busy && tc('busy', 'Free'), !allDay && travel.minutes && t('{n} min travel', { n: travel.minutes }),
+        <summary>{[t('More options'), repeatText, !busy && tc('busy', 'Free'), !allDay && travel.minutes && t('{n} min travel', { n: travel.minutes }),
           categories.find(c => c.id === categoryId)?.name].filter(Boolean).join(' · ')}</summary>
       {remindersEditable && (
         <div className="field">
@@ -1556,16 +1597,7 @@ export function EventEditSheet({ event, prefill, shared, calendars, offerNewLoca
         </select>
       </div>
       {!allDay && <TravelFields minutes={travel.minutes} remind={travel.remind} onChange={(minutes, remind) => setTravel({ minutes, remind })} />}
-      <div className="field">
-        <label>{t('Repeat')}</label>
-        <select value={rrule} onChange={e => setRrule(e.target.value as RepeatChoice)}>
-          <option value="">{t('Does not repeat')}</option>
-          <option value="daily">{t('Daily')}</option>
-          <option value="weekly">{t('Weekly')}</option>
-          <option value="monthly">{t('Monthly')}</option>
-          <option value="yearly">{t('Yearly')}</option>
-        </select>
-      </div>
+      {repeatable && <RepeatFields value={repeat} start={repeat.touched ? startDate : initialDay} onChange={next => { setRepeat(next); setAskScope(false) }} />}
       <div className="field">
         <label>{t('Category')}</label>
         <select value={categoryId ?? ''} onChange={e => setCategoryId(e.target.value || null)}>
