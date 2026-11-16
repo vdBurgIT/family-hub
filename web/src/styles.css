@@ -676,7 +676,7 @@ button.month-cell .month-daynum { flex: none; }
 
 /* ---------- Event detail sheet ---------- */
 .detail-color-bar { height: 8px; border-radius: 4px; }
-.schedule-time { font-size: 0.8125rem; font-weight: 800; color: var(--text-dim); width: 68px; flex-shrink: 0; }
+.schedule-time { font-size: 0.8125rem; font-weight: 800; color: var(--text-dim); width: 92px; flex-shrink: 0; }
 .schedule-title { font-weight: 800; font-size: 0.9375rem; }
 .schedule-loc { font-size: 0.78125rem; color: var(--text-dim); }
 

@@ -19,6 +19,7 @@ import { PriorityBadge } from './PriorityBadge.tsx'
 import { Segmented, announce } from './a11y.tsx'
 import { minutesSinceMidnight, todayKeyInTz } from './date.ts'
 import { formatTime } from './timeFormat.ts'
+import { eventSpan } from './eventSpan.ts'
 import { byMealTime, SLOT_LABEL } from './meal-date.ts'
 import MealQuickSheet from './MealQuickSheet.tsx'
 import type { Meal } from './meal-types.ts'
@@ -337,7 +338,7 @@ function EventRow({ e, tz, close }: { e: SnapshotEvent; tz: string; close: () =>
   return (
     <li>
       <button className="snap-row" onClick={() => go(eventHash(e), close)}>
-        <span className="snap-time">{e.allDay ? t('All day') : formatTime(e.start, tz)}</span>
+        <span className="snap-time">{e.allDay ? t('All day') : eventSpan(e, e.date, tz)}</span>
         <span className="snap-main">
           <span className="snap-title"><span className="snap-swatch" aria-hidden="true" style={{ background: e.color }} />{e.busy === false && <span className="ev-free-mark">{tc('busy', 'Free')} ·</span>}{e.title}</span>
           {(leadOf(e) || e.location) && (

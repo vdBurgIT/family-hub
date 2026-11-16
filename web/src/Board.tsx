@@ -15,6 +15,7 @@ import { zonedParts } from './date.ts'
 import { LoadError } from './a11y.tsx'
 import { dedupeEvents } from './dayLayout.ts'
 import { formatTime } from './timeFormat.ts'
+import { eventSpan } from './eventSpan.ts'
 import { isLate } from './choreDay.ts'
 import { durationLabel } from './timers.ts'
 import { intlLocale, msg, t, tn } from './i18n.ts'
@@ -880,7 +881,7 @@ function EventLine({ e, tz, byId, onTap, past }: { e: SnapshotEvent; tz: string;
   const bar = who.length > 1
     ? `linear-gradient(${who.map((m, i) => `${m.color} ${(i * 100) / who.length}% ${((i + 1) * 100) / who.length}%`).join(', ')})`
     : who[0]?.color ?? e.color
-  const when = e.allDay ? t('All day') : formatTime(e.start, tz)
+  const when = e.allDay ? t('All day') : eventSpan(e, e.date, tz)
   // Its category's emoji, as on Calendar, so a category-colored event there (⚽ Sports, green) reads
   // as the same one here, where its bar is in the person's color.
   const emoji = useApp().categories.find(c => c.id === e.categoryId)?.emoji

@@ -1,3 +1,4 @@
+import { eventSpan } from './eventSpan.ts'
 import { EventFollow } from './EventFollow.tsx'
 import { AnnouncementsButton } from './FamilyAnnouncements.tsx'
 import { Fragment, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -64,12 +65,10 @@ function isAllDayOnDate(ev: EventInstance, key: string) {
   return ev.start <= key && key < ev.end
 }
 /** Show the portion on this day, while opening/editing the original event. */
+/** Start and end on the day `key`: "15:00 – 16:30", and a stay over several days with its other
+ * days named ("Fri 17:00 – Mon 09:00"), so it's clear when it starts and ends (eventSpan.ts). */
 function eventTimeOnDate(ev: EventInstance, key: string, tz: string) {
-  const startDay = zonedDayKey(ev.start, tz), endDay = zonedDayKey(ev.end, tz)
-  if (startDay === endDay) return formatTime(ev.start, tz)
-  const start = startDay < key ? t('Midnight') : formatTime(ev.start, tz)
-  const end = endDay > key ? t('Midnight') : formatTime(ev.end, tz)
-  return `${start} – ${end}`
+  return eventSpan(ev, key, tz)
 }
 
 /** Current minute-of-day in `tz`, refreshed every minute (for the now-line + auto-scroll). */
@@ -661,7 +660,7 @@ type ChipCategory = { id: string; name: string; color: string; emoji: string | n
 function eventLabel(ev: EventInstance, tz: string, members: ChipMember[], categories: ChipCategory[], day?: string): string {
   const who = new Intl.ListFormat(intlLocale()).format(members.filter(m => ev.memberIds.includes(m.id)).map(m => m.name))
   const category = ev.categoryId ? categories.find(c => c.id === ev.categoryId)?.name : undefined
-  const head = `${ev.allDay ? t('All day') : day ? eventTimeOnDate(ev, day, tz) : formatTime(ev.start, tz)} ${ev.title}`
+  const head = `${ev.allDay ? t('All day') : eventTimeOnDate(ev, day ?? zonedDayKey(ev.start, tz), tz)} ${ev.title}`
   return [ev.hidden ? t('Hidden: {event}', { event: head }) : head, ev.busy === false && t('free'), who, ev.location, category, ((l) => l && leadBy(l, formatTime(l.at, tz), true))(leadOf(ev)), ev.noteCount && tn(ev.noteCount, '{n} note', '{n} notes'), ev.meal && t('meal: {status}', { status: mealEventStatus(ev.meal).text.replace('✓ ', '') })].filter(Boolean).join(', ')
 }
 
@@ -943,7 +942,7 @@ function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, 
                 return (
                   <div key={ev.id} className={`month-chip${evClass(ev)}`} style={evFill(background, ink, solid)} {...pressable(() => onTap(ev))} aria-label={eventLabel(ev, tz, members, categories, key)}>
                     {/* A phone's month cell is ~50px wide: time or avatars alone filled it, so show just the title. */}
-                    <EventTitle title={`${ev.allDay || isPhone ? '' : eventTimeOnDate(ev, key, tz) + ' '}${ev.title}`} avatars={isPhone ? [] : avatars} emoji={emoji} pill={pill} hidden={!!ev.hidden} free={ev.busy === false} meal={ev.meal} />
+                    <EventTitle title={`${ev.allDay || isPhone ? '' : formatTime(ev.start, tz) + ' '}${ev.title}`} avatars={isPhone ? [] : avatars} emoji={emoji} pill={pill} hidden={!!ev.hidden} free={ev.busy === false} meal={ev.meal} />
                   </div>
                 )
               })}
@@ -1064,7 +1063,8 @@ function EventDetailSheet({ event, members, categories, calendars, canEdit, tz, 
         <div className="detail-color-bar" style={{ background: detailBar }} />
         <div style={{ fontWeight: 800, fontSize: '0.9375rem' }}>
           {event.allDay ? (() => { const last = allDayLastDay(event.start, event.end); return `${formatDate(new Date(event.start + 'T00:00:00'), DAY)}${last ? ' – ' + formatDate(new Date(last + 'T00:00:00'), DAY) : ''} · ${t('All day')}` })()
-            : `${formatDate(new Date(event.start), DAY)} · ${formatTime(event.start, tz)} – ${formatTime(event.end, tz)}`}
+            : zonedDayKey(event.start, tz) === zonedDayKey(event.end, tz) ? `${formatDate(new Date(event.start), DAY)} · ${formatTime(event.start, tz)} – ${formatTime(event.end, tz)}`
+              : `${formatDate(new Date(event.start), DAY)} ${formatTime(event.start, tz)} – ${formatDate(new Date(event.end), DAY)} ${formatTime(event.end, tz)}`}
         </div>
         {event.meal && event.meal.mealKind !== 'dining_out' && <div className="chip-row"><span className="chip chip-static">🍽️ {mealEventStatus(event.meal).text}</span></div>}
         {event.location && (() => {
