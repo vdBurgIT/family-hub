@@ -22,6 +22,7 @@
 * [Family polls](using/polls.md)
 * [Inbox](using/inbox.md)
 * [Events](using/events.md)
+* [Kids' schedule](using/kids-schedule.md)
 * [Categories & auto-categorizing](using/categories.md)
 * [Chores](using/chores.md)
 * [Rewards](using/rewards.md)

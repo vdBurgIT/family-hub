@@ -26,6 +26,7 @@ import { tidbitCardTitle, tidbitCards, tidbitFor, tidbitQuery, tidbitSlot, type 
 import { BirthdayRow, ItemRow, dayName } from './Snapshot.tsx'
 import TodaysMeals from './TodaysMeals.tsx'
 import HomeTiles, { useHome } from './HomeCard.tsx'
+import { CustodyToday, useCustody } from './Custody.tsx'
 import { boardGoals } from './tempCheck.ts'
 import { TakeNowTile, useDueDoses, useTakeNowSlot } from './TakeNow.tsx'
 import Sheet from './Sheet.tsx'
@@ -434,6 +435,7 @@ export default function Board({ show, onTap, chipHost }: { show: (e: EventInstan
   const tidbitAreas = ['tidbit', 'tidbit2', 'tidbit3']
 
   // Family Hub: only a layout with the Home card asks Home Assistant (before the early return: a hook).
+  const custody = useCustody().schedule
   const homeState = useHome(!!layout?.columns.some(col => col.some(c => c.id === 'home')))
   if (!data) return error ? <LoadError what="the board" onRetry={() => setTick(n => n + 1)} /> : null
   const byId = new Map(members.map(m => [m.id, m]))
@@ -683,9 +685,11 @@ export default function Board({ show, onTap, chipHost }: { show: (e: EventInstan
             // Chores with a start time or a timer, among the events by time (boardFit.ts withTimedChores).
             const startOf = (e: SnapshotEvent) => { const z = zonedParts(e.start, tz); return e.allDay || `${z.year}-${String(z.month).padStart(2, '0')}-${String(z.day).padStart(2, '0')}` < today ? -1 : z.hour * 60 + z.minute }
             const rows = withTimedChores(todays.shown, startOf, timed)
-            if (!bdays.length && !rows.length && !todays.earlier.length && !books.length) return <>{goals.length > 0 && <ul className="snap-list">{goals}</ul>}<p className="snap-empty">{t('Nothing on the calendar today.')}</p></>
+            const kids = <CustodyToday schedule={custody} />
+            if (!bdays.length && !rows.length && !todays.earlier.length && !books.length) return <>{(goals.length > 0 || custody) && <ul className="snap-list">{kids}{goals}</ul>}<p className="snap-empty">{t('Nothing on the calendar today.')}</p></>
             return (
               <ul className="snap-list">
+                {kids}
                 {goals}
                 {bdays.map(b => <BirthdayRow key={`${b.memberId ?? b.eventId}`} b={b} you="" close={noop} />)}
                 {books}

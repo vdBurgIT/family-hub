@@ -203,6 +203,7 @@ const PUBLIC_PATH =
 const DISPLAY_ALLOWED: { method: string; pattern: RegExp }[] = [
   { method: 'GET', pattern: /^\/api\/announcements$/ },
   { method: 'GET', pattern: /^\/api\/home$/ }, // Family Hub: the board's Home card
+  { method: 'GET', pattern: /^\/api\/custody$/ }, // Family Hub: the kids' schedule (parents change it)
   { method: 'POST', pattern: /^\/api\/home\/[a-z_]+\.[a-z0-9_]+\/toggle$/ }, // switch a tile a parent put on the board
   { method: 'PUT', pattern: /^\/api\/push\/(native|android)$/ },
   { method: 'GET', pattern: /^\/api\/recipes(\/[^/]+)?$/ },

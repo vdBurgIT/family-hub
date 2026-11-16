@@ -1,4 +1,5 @@
 import type { PlanningDraft, WeeklyPlanning } from './weekly-planning.ts'
+import { demoCustody, type CustodySchedule } from './custody.ts'
 import type { Announcement, AnnouncementInput, Announcements } from './announcements.ts';
 import type { InboxItem, InboxSort } from './inbox.ts';
 import { lang, msg, t, tm, type Lang } from './i18n.ts'
@@ -357,6 +358,9 @@ export const api = {
   toggleHome: (entityId: string) => post<HomeTile>(`api/home/${encodeURIComponent(entityId)}/toggle`),
   getHomeEntities: () => get<HomeEntity[]>('api/home/entities'),
   setHomeTiles: (entityIds: string[]) => put<{ entityIds: string[] }>('api/home/tiles', { entityIds }),
+  // Family Hub: the kids' schedule (server/src/routes/custody.ts).
+  getCustody: () => MOCK ? Promise.resolve({ schedule: demoCustody() }) : get<{ schedule: CustodySchedule | null }>('api/custody'),
+  setCustody: (schedule: CustodySchedule | null) => put<{ schedule: CustodySchedule | null }>('api/custody', { schedule }),
   getWeeklyPlanning: (weekStart?: string) => get<WeeklyPlanning>('api/weekly-plan' + qs({ weekStart })),
   saveWeeklyDraft: (weekStart: string, revision: number, draft: PlanningDraft) => put<WeeklyPlanning>('api/weekly-plan/' + encodeURIComponent(weekStart), { revision, draft }),
   applyWeeklyPlan: (weekStart: string, input: { revision: number; sourceVersion: number; requestId: string; draft: PlanningDraft }) => post<WeeklyPlanning>('api/weekly-plan/' + encodeURIComponent(weekStart) + '/apply', input),

@@ -4245,6 +4245,48 @@ html:root[data-cast] {
 .home-pick-group legend { font-weight: 800; margin-bottom: 4px; }
 .home-pick-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 
+/* ---------- Family Hub: the kids' schedule (Custody.tsx) ----------
+   A strip on each day instead of an all-day event: filled all day, half filled on the side of the
+   day the kids are there when they come or go, with the words always on it (color is never alone). */
+.custody-strip, .custody-today { --custody-fill: color-mix(in srgb, var(--success) 24%, var(--card)); --custody-edge: color-mix(in srgb, var(--success) 70%, var(--card)); }
+.custody-row { display: grid; border-bottom: 1px solid var(--border); }
+.custody-row > .custody-strip { margin: 2px 3px; }
+.custody-strip {
+  display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 22px; padding: 1px 6px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text);
+  font: inherit; font-size: 0.75rem; font-weight: 700; text-align: left; line-height: 1.2;
+}
+.custody-strip > span[aria-hidden] { display: contents; }
+.custody-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.custody-here { background: var(--custody-fill); box-shadow: inset 3px 0 0 var(--custody-edge); }
+.custody-arrive { background: linear-gradient(90deg, transparent 0 35%, var(--custody-fill) 65%); }
+.custody-leave { background: linear-gradient(90deg, var(--custody-fill) 35%, transparent 65%); box-shadow: inset 3px 0 0 var(--custody-edge); }
+.custody-changed { outline: 1.5px dashed var(--custody-edge); outline-offset: -1.5px; }
+button.custody-strip { min-height: 28px; }
+.custody-row button.custody-away::after { content: '+'; color: var(--text-dim); margin-left: auto; opacity: 0.6; }
+.custody-faces { display: inline-flex; gap: 1px; flex: none; }
+.month-cell > .custody-strip { min-height: 18px; padding: 0 4px; font-size: 0.6875rem; }
+/* A phone's month cell is about 50px: the house alone, with an arrow for coming (→🏠) or going (🏠→). */
+@media (max-width: 600px) {
+  .month-cell > .custody-strip { justify-content: center; padding: 0; }
+  .month-cell > .custody-strip .custody-text { display: none; }
+  .month-cell > .custody-arrive .custody-mark::before { content: '→'; }
+  .month-cell > .custody-leave .custody-mark::after { content: '→'; }
+}
+.schedule-list .custody-strip { margin-top: 6px; }
+.snap-list > .custody-today { font-weight: 700; padding: 8px 4px; border-radius: 6px; background: var(--custody-fill); }
+.custody-settings .field { margin: 0; }
+.custody-settings { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+.custody-row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.custody-row2 .field { margin: 0; }
+.custody-week { border: 1px solid var(--border); border-radius: var(--radius, 12px); padding: 8px 12px 10px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.custody-week legend { font-weight: 800; padding: 0 4px; }
+.custody-day-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 44px; }
+.custody-day-row > label { font-weight: 700; }
+.custody-day-fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.custody-day-fields .settings-select { min-height: 44px; }
+.custody-time { min-height: 44px; width: 9.5em; }
+
 /* ---------- Pointer and hover ----------
    Anything clickable shows a pointer; a disabled control shows not-allowed. :where() keeps this at
    zero specificity, so a component's own cursor (a grab handle, a crosshair) still wins. */
@@ -4264,7 +4306,7 @@ html:root[data-cast] {
   /* Everything else: a faint wash of the text color over its own background (darker in light, lighter in dark). */
   :where(.btn-primary, .btn-danger, .swipe-delete, .icon-btn, .fab, .today-btn, .segmented button, .tab-btn, .nav-rail-btn, .who-btn,
     .family-row, .family-pick, .board-tile, .snap-row, .shop-row, .board-empty-tap, .notif-item, .member-list-item, .cal-edit-btn,
-    .home-tile, .schedule-item, .month-cell, .list-item-row, .lists-section-head, .add-row-btn, .trk-book-main, .trk-visit-main, .trk-memory, .lib-book,
+    .home-tile, .custody-strip, .schedule-item, .month-cell, .list-item-row, .lists-section-head, .add-row-btn, .trk-book-main, .trk-visit-main, .trk-memory, .lib-book,
     .activity-card, .chore-card-edit, .list-card-edit, button.plugin-chore-chip, .recipe-step, .menu-pick, .order-tick, .order-row, .note, .more-row, .setup-chore-tap, .board-poll-btn, .board-slot-row, .board-slot-chip, a.board-slot-full, button.board-slot-full, .board-slot-head-link, .catalog-row-main, .paint-btn, .paint-brush-tile, .paint-stamp, .paint-size, .settings-acc-btn, button.profile-bonus-row, .toast-action, .outing-pile-head, .outing-pile-item):not(:disabled, .active):hover {
     background-image: linear-gradient(color-mix(in srgb, var(--text) 8%, transparent) 0 0);
   }

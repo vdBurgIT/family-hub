@@ -46,10 +46,14 @@ import { CALENDAR_VIEWS, HOME_VIEWS, dayOrigin, isCalendarView, isHomeView, last
 import { onDayChange, onMinute, rollToToday } from './minuteTick.ts'
 import { DAY, LONG_DAY, formatDate, intlLocale, t, tc, tm, tn } from './i18n.ts'
 import { InlineFaces, ChipFace } from './Face'
+import { CustodyDaySheet, CustodyStrip, useCustody } from './Custody.tsx'
+import type { CustodySchedule } from './custody.ts'
 
 const WeeklyPlanner = lazy(() => import('./WeeklyPlanner.tsx'))
 
 const PHONE_WEEK_DAYS = 3
+/** Family Hub: the kids' schedule strip on each day (Custody.tsx); onTap on parents' devices. */
+type CustodyView = { schedule: CustodySchedule | null; onTap?: (day: string) => void }
 const NEW_LOCAL_CALENDAR = '__new_local'
 const CATEGORY_FILTER_KEY = 'kinwall.categoryFilter'
 const NO_CATEGORY = '__none'
@@ -122,6 +126,8 @@ const clearQuery = () => history.replaceState(history.state, '', hashPath(locati
 export default function CalendarView({ place }: { place: 'home' | 'calendar' }) {
   const dialog = useDialog()
   const { settings, members, categories, selectedMemberId, setSelectedMemberId, focusMemberId, focusShowsShared, focusLocked, meMemberId, parentDevice, toast, reloadCore, refreshTick } = useApp()
+  const { schedule: custodySchedule, save: saveCustody } = useCustody()
+  const [custodyDay, setCustodyDay] = useState<string | null>(null)
   const device = useDeviceAppearance()
   const isPhone = useIsPhone()
   // Where the Board puts one or two count tiles as chips (boardFit.ts tileChips); a phone's toolbar has no room.
@@ -137,6 +143,7 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
     return home ? (isHomeView(demo) ? demo : 'board') : linkedCalendarView(location.hash) ?? lastCalendarView(isPhone)
   })
   const locked = home ? isHomeView(device.lockView) : isCalendarView(device.lockView)
+  const custody: CustodyView = { schedule: custodySchedule, onTap: parentDevice ? setCustodyDay : undefined }
   // Newscast turned off (Settings → Features): its tab goes, and a screen showing or locked to it shows the Board.
   const newscastOn = settings.features.newscast !== false
   const viewMode: ViewMode = ((v: ViewMode) => v === 'newscast' && !newscastOn ? 'board' : v)(locked ? device.lockView! : chosenView)
@@ -603,15 +610,15 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
         ) : !loading && visibleEvents.length === 0 && viewMode === 'schedule' ? (
           <div className="empty-card"><span className="emoji">🗓️</span>{activeCategoryFilter.length ? t('No events in the next 30 days match the category filter.') : t('No events in the next 30 days.')}</div>
         ) : viewMode === 'week' ? (
-          <WeekView days={weekDays} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} onSlotTap={openAdd} onDayTap={openDay} />
+          <WeekView days={weekDays} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} onSlotTap={openAdd} onDayTap={openDay} custody={custody} />
         ) : viewMode === 'day' ? (
           // One shared timeline (the Week grid with one day): concurrent events side by side, each once, with who it's for on it.
-          <WeekView days={[startOfDay(anchor)]} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} onDayTap={openDay}
+          <WeekView days={[startOfDay(anchor)]} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} onDayTap={openDay} custody={custody}
             onSlotTap={p => openAdd(selectedMemberId ? { ...p, memberIds: [selectedMemberId] } : p)} />
         ) : viewMode === 'month' ? (
-          <MonthView anchor={anchor} events={visibleEvents} tz={tz} weekStart={settings.weekStart} members={members} categories={categories} onTap={setDetail} onDayTap={openDay} dayOnly={isPhone && !locked} />
+          <MonthView anchor={anchor} events={visibleEvents} tz={tz} weekStart={settings.weekStart} members={members} categories={categories} onTap={setDetail} onDayTap={openDay} dayOnly={isPhone && !locked} custody={custody} />
         ) : (
-          <ScheduleView anchor={anchor} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} />
+          <ScheduleView anchor={anchor} events={visibleEvents} tz={tz} members={members} categories={categories} onTap={setDetail} custody={custody} />
         )}
         </div>
       </div>
@@ -666,6 +673,7 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
           <p>{t('This event repeats. It is deleted from the calendar it came from too.')}</p>
         </Sheet>
       )}
+      {custodyDay && custodySchedule && <CustodyDaySheet schedule={custodySchedule} day={custodyDay} onSave={saveCustody} onClose={() => setCustodyDay(null)} />}
       {checkInMember && <SnapshotSheet member={checkInMember} toCheckIn={morningCheckIn ? 'morning' : true} onClose={() => setCheckIn(null)} />}
     </div>
   )
@@ -769,8 +777,8 @@ function timedMealText(meal: NonNullable<EventInstance['meal']>, wide: boolean) 
 /** Renders an N-day time grid (all-day row, now-line, auto-scroll, overlap columns). Used for
  * the wall iPad's 7-day Week, the phone's 3-day view and Day view (one day) — `days` is the only
  * thing that changes between them, decided by the caller. */
-function WeekView({ days, events, tz, members, categories, onTap, onSlotTap, onDayTap }: {
-  days: Date[]; events: EventInstance[]; tz: string; members: ChipMember[]; categories: ChipCategory[]
+function WeekView({ days, events, tz, members, categories, onTap, onSlotTap, onDayTap, custody }: {
+  days: Date[]; events: EventInstance[]; tz: string; members: ChipMember[]; categories: ChipCategory[]; custody: CustodyView
   onTap: (e: EventInstance) => void; onSlotTap: (prefill: Partial<EventInstance>) => void; onDayTap: (d: Date) => void
 }) {
   const baseHourPx = useHourPx()
@@ -820,6 +828,10 @@ function WeekView({ days, events, tz, members, categories, onTap, onSlotTap, onD
               </button>
             )
           })}
+        </div>}
+        {custody.schedule && <div className="custody-row" style={{ gridTemplateColumns: `50px repeat(${days.length}, minmax(0, 1fr))` }}>
+          <div />
+          {dayKeys.map(k => <CustodyStrip key={k} schedule={custody.schedule} day={k} short={days.length > 1 && !wide} onTap={custody.onTap && (() => custody.onTap!(k))} />)}
         </div>}
         {maxAllDay > 0 && (
           <div className="allday-row" style={{ gridTemplateColumns: `50px repeat(${days.length}, minmax(0, 1fr))`, minHeight: maxAllDay * 26 + 6 }}>
@@ -881,8 +893,8 @@ function WeekView({ days, events, tz, members, categories, onTap, onSlotTap, onD
 const MONTH_CHIP_ROW_PX = 21
 const MONTH_DAYNUM_ROW_PX = 32
 
-function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, onDayTap, dayOnly }: {
-  anchor: Date; events: EventInstance[]; tz: string; weekStart: 0 | 1; members: ChipMember[]; categories: ChipCategory[]
+function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, onDayTap, dayOnly, custody }: {
+  anchor: Date; events: EventInstance[]; tz: string; weekStart: 0 | 1; members: ChipMember[]; categories: ChipCategory[]; custody: CustodyView
   onTap: (e: EventInstance) => void; onDayTap: (d: Date) => void
   /** Phones: a cell is too small to aim at one event, so the whole day is one button that opens it. */
   dayOnly?: boolean
@@ -938,6 +950,7 @@ function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, 
             <button key={i} type="button" data-roving tabIndex={roving.tabIndex(i)} className={`month-cell ${isSameMonth(d, anchor) ? '' : 'dim'}`}
               aria-current={key === todayStr ? 'date' : undefined} aria-label={monthDayLabel(d, dayEvents.length)} onClick={() => onDayTap(d)}>
               <span aria-hidden="true" className={`month-daynum ${key === todayStr ? 'today' : ''}`}>{d.getDate()}</span>
+              {custody.schedule && <CustodyStrip schedule={custody.schedule} day={key} short />}
               {shown.map(ev => {
                 const { background, ink, emoji, pill, solid } = eventVisual(ev, members, categories, 6)
                 return (
@@ -955,6 +968,7 @@ function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, 
                 aria-current={key === todayStr ? 'date' : undefined}
                 aria-label={tn(dayEvents.length, '{day}, {n} event. Open day', '{day}, {n} events. Open day', { day: formatDate(d, LONG_DAY) })}
                 onClick={e => { e.stopPropagation(); onDayTap(d) }}>{d.getDate()}</button>
+              {custody.schedule && <CustodyStrip schedule={custody.schedule} day={key} short={isPhone} />}
               {shown.map(ev => {
                 const { background, avatars, ink, emoji, pill, solid } = eventVisual(ev, members, categories, 6)
                 return (
@@ -973,7 +987,7 @@ function MonthView({ anchor, events, tz, weekStart, members, categories, onTap, 
   )
 }
 
-function ScheduleView({ anchor, events, tz, members, categories, onTap }: { anchor: Date; events: EventInstance[]; tz: string; members: ChipMember[]; categories: ChipCategory[]; onTap: (e: EventInstance) => void }) {
+function ScheduleView({ anchor, events, tz, members, categories, onTap, custody }: { anchor: Date; events: EventInstance[]; tz: string; members: ChipMember[]; categories: ChipCategory[]; onTap: (e: EventInstance) => void; custody: CustodyView }) {
   const byDay = useMemo(() => {
     const map = new Map<string, EventInstance[]>()
     for (let i = 0; i < 30; i++) {
@@ -992,6 +1006,7 @@ function ScheduleView({ anchor, events, tz, members, categories, onTap }: { anch
       {[...byDay.entries()].map(([key, list]) => (
         <div key={key}>
           <div className="schedule-day-label">{formatDate(new Date(key + 'T00:00:00'), LONG_DAY)}</div>
+          {custody.schedule && <CustodyStrip schedule={custody.schedule} day={key} onTap={custody.onTap && (() => custody.onTap!(key))} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             {list.map(ev => {
               const { background, avatars, emoji } = eventVisual(ev, members, categories, 8)

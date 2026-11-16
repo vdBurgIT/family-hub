@@ -1,4 +1,5 @@
 import { homeRoutes } from './routes/home.ts';
+import { custodyRoutes } from './routes/custody.ts';
 import { weeklyPlanningRoutes } from './routes/weekly-planning.ts';
 import { runEventLiveActivities } from './event-live-activities.ts';
 import { eventFollowsRoutes } from './routes/event-follows.ts';
@@ -241,6 +242,7 @@ export function createApp() {
   app.route('/', snapshotRoutes);
   app.route('/', weatherRoutes);
   app.route('/', homeRoutes); // Family Hub: Home Assistant tiles
+  app.route('/', custodyRoutes); // Family Hub: the kids' schedule
   app.route('/', booksRoutes);
   app.route('/', libraryRoutes);
   app.route('/', tidbitRoutes);

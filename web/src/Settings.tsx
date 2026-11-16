@@ -45,6 +45,7 @@ import { QrCode } from './App.tsx'
 import { InstallRow } from './Install.tsx'
 import { appChoreNudgeAnyone, setAppChoreNudgeAnyone, appNativePush, appPushReady, appPushProblem, setAppPushEnabled, addAppTile, appKidDoses, appLiveActivities, appMedicineNames, appNotificationSettings, appPlatform, appQuickSettingsTiles, appStatusBarHidden, inNativeApp, liveActivitiesLine, openAppNotificationSettings, setAppKidDoses, setAppMedicineNames, setAppStatusBarHidden } from './native.ts'
 import { useDialog } from './dialog.tsx'
+import { CustodySettings } from './Custody.tsx'
 import { BoardPresetRows, DeviceBoardLayoutRows } from './BoardEditor.tsx'
 import { TEMP_CHECK_OFF } from './tempCheck.ts'
 import { EVENING_TIMES } from './journal.ts'
@@ -221,6 +222,8 @@ export default function SettingsView() {
               {settings.features.meals && <MealSettingsSection settings={settings} onSaved={reloadCore} toast={toast} readOnly={isDisplay} />}
               {!isDisplay && settings.features.lists && <ShoppingSettingsSection settings={settings} onSaved={reloadCore} toast={toast} />}
               {/* Community calendars are a parent's to manage (routes/outing-feeds.ts refuses walls and kids' devices). */}
+              {/* Family Hub: which days the kids are home (Custody.tsx); parents make it. */}
+              {!isDisplay && <Section id="kids-schedule" title={t("Kids' schedule")} keywords={[t('Custody'), t('Kids here')]}><CustodySettings toast={toast} /></Section>}
               {!isDisplay && settings.features.outings !== false && <Section id="outings" title={t('Outings')}><CommunityCalendars /></Section>}
             </>}
             {k === 'calendars' && <>
