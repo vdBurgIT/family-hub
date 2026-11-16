@@ -543,6 +543,7 @@ export const EventInstanceSchema = z
     occurrenceStart: z.string().nullable(),
     readOnly: z.boolean(),
     seriesId: z.string().nullable(),
+    seriesRrule: z.string().nullable().optional().openapi({ description: "A synced CalDAV occurrence: its series' repeat rule (RRULE value). Its rows are already one per occurrence; rrule stays null for them. null otherwise" }),
     memberScope: z.enum(['occurrence', 'series', 'calendar', 'none']),
     categoryId: z.string().nullable(),
     categorySource: z.enum(['event', 'series', 'keyword', 'calendar']).nullable(),

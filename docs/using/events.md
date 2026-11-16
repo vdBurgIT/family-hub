@@ -8,7 +8,7 @@ Tap an event to open its sheet. It shows:
 
 * **When**: the date and time range, or "All day". Multi-day all-day events show their date range.
 * **Location**: a link. If the location contains a URL (a video-call link), that URL opens. A street address opens Apple Maps on Apple devices and Google Maps elsewhere. Obviously virtual places ("Zoom", "Teams", "online", "TBD") stay plain text.
-* **Repeats**, if the event recurs.
+* **Repeats**, if the event recurs, in one line: "Every 2 weeks on Mon and Thu, until Jun 1".
 * **Calendar**: the name of the calendar the event is on.
 * **Category**: "🎂 Birthdays". See [Categories](categories.md).
 * **Reminder**: "🔔 30 min before", or "🔔 At the start" for one at the start time (Google's "At time of event"). "· default" is added when it comes from the household default.
@@ -36,10 +36,10 @@ Tap **+**, or tap an empty slot in the time grid (this pre-fills the time). Afte
 | **Location** | Optional. |
 | **Notes** | Optional, several lines: what to bring, a link, a gate code. See [Event notes](#event-notes). |
 | **Who** | Family member chips. |
-| **More options** | Folded away, since most events need only a title, a time and who. Its line says what's set inside ("More options · Repeats weekly · Free"). Tap it for Reminder, Show as, [Travel time](#travel-time-and-leave-by), Repeat and Category, below. |
+| **More options** | Folded away, since most events need only a title, a time and who. Its line says what's set inside ("More options · Every week on Tue · Free"). Tap it for Reminder, Show as, [Travel time](#travel-time-and-leave-by), Repeat and Category, below. |
 | **Show as** | **Busy** (the default) or **Free (doesn't block time)**. See [Free or busy](#free-or-busy). |
 | **Reminder** | Local, Google and Outlook calendars only. Options: None, 5, 10, 15 or 30 minutes, 1 hour, 1 day, plus **Family default** (local) or **Google calendar default** (Google). Outlook has no "default" to write back. Reminders that came from the provider and don't match a preset stay as they are. |
-| **Repeat** | Does not repeat, Daily, Weekly, Monthly or Yearly (a birthday, an anniversary, a yearly checkup). More complex rules from a provider or the API are kept as long as you don't change this menu. |
+| **Repeat** | Kinwall and iCloud (CalDAV) calendars. Does not repeat, Daily, Weekly, Monthly or Yearly (a birthday, an anniversary, a yearly checkup), then **Repeat every** 1, 2, 3... days, weeks, months or years. Weekly: tap the days it's on (it starts on the start date's weekday). Monthly: **On day 15**, or **On the second Tuesday** / **On the last Friday**, from the start date. **Ends**: never, on a date, or after a number of times. A line under it says it in words ("Every 2 weeks on Mon and Thu, until Jun 1"). A rule made somewhere else that these choices can't show reads **Custom repeat** and stays as it is unless you pick another repeat. Google and Outlook calendars don't offer a repeat: set it up in their own app. |
 | **Category** | **Automatic** (keyword or calendar default, with a hint showing which) or a specific category. On a recurring event, **Apply the category to** offers **All events** or **This event**. |
 
 When you edit, only the fields you changed are sent. An unrelated edit never pins an inherited member list or category onto the event, and never restarts a repeating series.
@@ -61,6 +61,8 @@ The API answers a refused change with `403`, for example `{"error":"This device 
 
 * **Local recurring events** are one series. Edit and delete apply to the whole series.
 * **Synced recurring events** (Google, Outlook, CalDAV) arrive as separate occurrences. Members and category can be set for **This event** or for **All events in the series**. Travel time is per occurrence.
+* **iCloud (CalDAV) recurring events**: saving an edit asks **Just this one** or **This and every one in the series**, and **Delete event** asks **Just this one** or **Every one in the series**. Just this one changes or skips that day only, in iCloud too; the rest of the series stays as it is. Every one moves every occurrence by as much as this one moved, at the same clock time across daylight saving time. Changing the repeat itself always changes the whole series. Whatever Kinwall doesn't edit (alerts, invitees, links) stays on the event.
+* **Google and Outlook**: an edit or delete changes just that occurrence.
 
 ## Reminders
 

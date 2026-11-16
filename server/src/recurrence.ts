@@ -13,7 +13,7 @@ export type DateParts = { y: number; mo: number; d: number; h: number; mi: numbe
 // expanding a week of repeating events asks for thousands of these.
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
-function zonedParts(utcDate: Date, tz: string): DateParts {
+export function zonedParts(utcDate: Date, tz: string): DateParts {
   let dtf = formatters.get(tz);
   if (!dtf) {
     dtf = new Intl.DateTimeFormat('en-US', {

@@ -361,6 +361,7 @@ export interface EventInstance {
   occurrenceStart: string | null
   readOnly: boolean
   seriesId: string | null // set for occurrences of a recurring synced event
+  seriesRrule?: string | null // a synced iCloud (CalDAV) occurrence: its series' repeat rule (rrule stays null)
   memberScope: 'occurrence' | 'series' | 'calendar' | 'none' // where memberIds came from
   categoryId: string | null
   categorySource: 'event' | 'series' | 'keyword' | 'calendar' | null // where categoryId came from

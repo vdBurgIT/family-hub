@@ -97,9 +97,9 @@ async function buildProviderCtx(env: Env, cal: CalendarRow): Promise<ProviderCtx
 function insertEventStmt(env: Env, calendarId: string, ev: NormalizedEvent, now: Date, id: string) {
   return env.DB.prepare(
     // Upsert: ids are deterministic, so a new event and a changed one take the same statement.
-    'INSERT INTO events (id, calendar_id, external_id, title, start, end, all_day, location, description, rrule, member_ids, updated_at, series_id, reminders, busy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+    'INSERT INTO events (id, calendar_id, external_id, title, start, end, all_day, location, description, rrule, member_ids, updated_at, series_id, reminders, busy, series_rrule) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
       'ON CONFLICT(id) DO UPDATE SET title = excluded.title, start = excluded.start, end = excluded.end, all_day = excluded.all_day, ' +
-      'location = excluded.location, description = excluded.description, updated_at = excluded.updated_at, series_id = excluded.series_id, reminders = excluded.reminders, busy = excluded.busy',
+      'location = excluded.location, description = excluded.description, updated_at = excluded.updated_at, series_id = excluded.series_id, reminders = excluded.reminders, busy = excluded.busy, series_rrule = excluded.series_rrule',
   ).bind(
     id,
     calendarId,
@@ -116,6 +116,7 @@ function insertEventStmt(env: Env, calendarId: string, ev: NormalizedEvent, now:
     ev.seriesId ?? null,
     Array.isArray(ev.reminders) ? JSON.stringify(ev.reminders) : null, // '[]' = explicitly none
     ev.busy === false ? 0 : 1,
+    ev.seriesRrule ?? null,
   );
 }
 
@@ -130,6 +131,7 @@ type StoredEvent = {
   series_id: string | null;
   reminders: string | null;
   busy: number;
+  series_rrule: string | null;
 };
 
 // The provider-sourced columns insertEventStmt writes, compared as stored.
@@ -143,7 +145,8 @@ function sameAsStored(ev: NormalizedEvent, row: StoredEvent): boolean {
     row.description === (ev.description ?? null) &&
     row.series_id === (ev.seriesId ?? null) &&
     row.reminders === (Array.isArray(ev.reminders) ? JSON.stringify(ev.reminders) : null) &&
-    row.busy === (ev.busy === false ? 0 : 1)
+    row.busy === (ev.busy === false ? 0 : 1) &&
+    row.series_rrule === (ev.seriesRrule ?? null)
   );
 }
 
@@ -159,7 +162,7 @@ function sameAsStored(ev: NormalizedEvent, row: StoredEvent): boolean {
 // (04:00Z in New York), and a slice ending earlier leaves it out without it being gone.
 async function diffEventStmts(env: Env, calendarId: string, events: NormalizedEvent[], window: { from: Date; to: Date } | null) {
   const ids = await deterministicEventIds(calendarId, events.map((ev) => ev.externalId));
-  const cols = 'id, title, start, end, all_day, location, description, series_id, reminders, busy';
+  const cols = 'id, title, start, end, all_day, location, description, series_id, reminders, busy, series_rrule';
   const stored = window
     ? env.DB.prepare(
         `SELECT ${cols} FROM events WHERE calendar_id = ? AND start >= ? AND start < ? AND (all_day = 0 OR start < ?)

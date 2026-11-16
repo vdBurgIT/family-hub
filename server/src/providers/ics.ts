@@ -211,6 +211,9 @@ export async function expandICS(
             `${(master.getFirstPropertyValue('summary') as string | null) || ''}\n${master.getFirstProperty('rrule')?.toICALString() ?? ''}`,
           ));
 
+    // CalDAV only (its rows are edited back): the rule the event sheet shows and edits.
+    const rule = seriesIdMode === 'uid' ? (master.getFirstPropertyValue('rrule') as ICAL.Recur | null)?.toString() : undefined;
+
     let iterator: ICAL.RecurExpansion;
     try {
       iterator = event.iterator();
@@ -251,6 +254,7 @@ export async function expandICS(
         location: item.location || undefined,
         description: notesText(item.description),
         seriesId,
+        ...(rule && { seriesRrule: rule }),
         reminders: minutesFromValarms(item.component),
         busy: !isTransparent(item.component),
         ...(cancelled && { cancelled }),

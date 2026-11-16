@@ -129,14 +129,6 @@ export function newEventDay(shown: Date[], now = new Date()): Date {
   return shown.find(d => d.toDateString() === now.toDateString()) ?? shown[0] ?? now
 }
 
-/** The event sheet's Repeat menu: what a stored rule shows as ('' when it doesn't repeat), and the
- * rule each choice saves. Anything fancier (FREQ=WEEKLY;BYDAY=MO,WE) shows as its frequency and is
- * kept as long as the menu isn't changed (Calendar.tsx). */
-export type RepeatChoice = '' | 'daily' | 'weekly' | 'monthly' | 'yearly'
-export const repeatChoice = (rrule: string | null | undefined): RepeatChoice =>
-  (['daily', 'weekly', 'monthly', 'yearly'] as const).find(f => rrule?.includes(`FREQ=${f.toUpperCase()}`)) ?? ''
-export const repeatRule = (choice: RepeatChoice): string | null => choice ? `FREQ=${choice.toUpperCase()}` : null
-
 /** Timed events end exclusively: midnight belongs to the preceding day only. */
 export function isTimedOnDate(ev: EventInstance, key: string, tz: string) {
   const lastInstant = new Date(Date.parse(ev.end) - 1).toISOString()
