@@ -26,8 +26,12 @@ const DICTS: Record<Lang, Record<string, string> | null> = { en: null, de };
 export const LOCALES: Record<Lang, string> = { en: 'en-US', de: 'de-DE' };
 
 type Vars = Record<string, string | number>;
+/** Family Hub: the fork's name in every sentence that says Kinwall (web/src/appName.ts has the same),
+ * before the placeholders are filled so names people typed keep their own words. */
+export const APP_NAME = 'Family Hub';
+const branded = (text: string) => (text.includes('Kinwall') ? text.replace(/\bKinwall\b/g, APP_NAME) : text);
 const fill = (text: string, vars?: Vars) =>
-  vars ? text.replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all)) : text;
+  vars ? branded(text).replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all)) : branded(text);
 const plurals = new Map<Lang, Intl.PluralRules>();
 
 /** Marks English kept in a constant so the check collects it; show it with tm(lang, text). */

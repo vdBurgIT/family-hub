@@ -124,15 +124,15 @@ test('live activities line: on, off in iPhone Settings, or nothing outside the i
   g.window = { kinwallNative: { platform: 'android' } }
   assert.equal(appLiveActivities(), null)
   delete g.window
-  assert.match(liveActivitiesLine(true)!, /^Countdowns and timers show on the Lock Screen\. Turn them off in iPhone Settings → Kinwall → Live Activities\.$/)
+  assert.match(liveActivitiesLine(true)!, /^Countdowns and timers show on the Lock Screen\. Turn them off in iPhone Settings → Family Hub → Live Activities\.$/)
   assert.match(liveActivitiesLine(false)!, /Off in iPhone Settings/)
   assert.equal(liveActivitiesLine(null), null)
 })
 
 test('live activities line on Android: ongoing notifications, turned off in Android Settings', async () => {
   const { liveActivitiesLine } = await import('../src/native.ts')
-  assert.equal(liveActivitiesLine(true, 'android'), 'Countdowns show as ongoing notifications. Turn them off in Android Settings → Apps → Kinwall → Notifications.')
-  assert.match(liveActivitiesLine(false, 'android')!, /Android Settings → Apps → Kinwall → Notifications/)
+  assert.equal(liveActivitiesLine(true, 'android'), 'Countdowns show as ongoing notifications. Turn them off in Android Settings → Apps → Family Hub → Notifications.')
+  assert.match(liveActivitiesLine(false, 'android')!, /Android Settings → Apps → Family Hub → Notifications/)
   assert.equal(liveActivitiesLine(null, 'android'), null)
   assert.match(liveActivitiesLine(true, 'ios')!, /iPhone Settings/)
 })

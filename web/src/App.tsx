@@ -1,3 +1,4 @@
+import { APP_NAME } from './appName.ts'
 import { openJournal } from './pageNavigation.ts'
 import { holdAwake } from './wakeLock.ts'
 import { Suspense, lazy, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
@@ -1423,7 +1424,7 @@ function AppRoutes({ urlKey }: { urlKey: string | null }) {
   const inApp = hasKey && !!settings && !wizardActive && (section === 'routine' || section === 'profile' || section === 'journal' || section === 'insights' || section === 'medications' || NAV_ITEMS.some(i => i.key === section))
   // "Chores · Our Family": the family, not the product, is what tells tabs and home-screen icons apart.
   const familyName = settings?.familyName?.trim()
-  useEffect(() => { document.title = inApp ? `${tabLabel} · ${familyName || 'Kinwall'}` : 'Kinwall' }, [tabLabel, inApp, familyName])
+  useEffect(() => { document.title = inApp ? `${tabLabel} · ${familyName || APP_NAME}` : APP_NAME }, [tabLabel, inApp, familyName])
 
   if (wizardActive === null) {
     return (

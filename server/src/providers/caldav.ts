@@ -65,7 +65,7 @@ export function buildVevent(uid: string, ev: EventInput): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Kinwall//EN',
+    'PRODID:-//Family Hub//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,

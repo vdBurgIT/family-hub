@@ -1,3 +1,4 @@
+import { APP_NAME, SOURCE_URL, UPSTREAM_URL } from './appName.ts'
 import { DeviceKindSelect, SendMessageForm } from './settingsControls.tsx'
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import RoutineModeSettings from './RoutineModeSettings.tsx'
@@ -253,7 +254,8 @@ export default function SettingsView() {
           {me.version && <div>{t('Version {version}', { version: me.version })}</div>}
           <div className="settings-version-links">
             <a className="text-link" href="https://docs.kinwall.family" target="_blank" rel="noopener">{t('Help & docs')}</a>
-            <a className="text-link" href="https://github.com/JohnDuprey/kinwall" target="_blank" rel="noopener">{t('Source code')}</a>
+            <a className="text-link" href={SOURCE_URL} target="_blank" rel="noopener">{t('Source code')}</a>
+            <a className="text-link" href={UPSTREAM_URL} target="_blank" rel="noopener">{t('Based on {project} (AGPL-3.0)', { project: 'Kinwall' })}</a>
             <a className="text-link" href="https://docs.kinwall.family/contributing/credits" target="_blank" rel="noopener">{t('Open-source credits')}</a>
           </div>
         </div>
@@ -2657,7 +2659,7 @@ function DefaultCalendarRow({ calendars, onSaved, toast }: { calendars: Calendar
   if (!open.length) return null
   const chosen = open.find(c => c.id === settings.defaultCalendarId)
   const auto = calendars.find(c => c.default)
-  const kindLabel = (c: CalendarEntry) => c.kind === 'local' ? 'Kinwall' : PROVIDER_LABEL[c.kind] ?? c.kind
+  const kindLabel = (c: CalendarEntry) => c.kind === 'local' ? APP_NAME : PROVIDER_LABEL[c.kind] ?? c.kind
   const options = [
     { value: '', label: auto && !chosen ? t('Automatic: {name}', { name: auto.name }) : t('Automatic'), detail: t('Your own Kinwall calendar first') },
     ...open.map(c => ({ value: c.id, label: c.name, detail: kindLabel(c), lead: <PickSwatch color={c.color ?? '#888'} /> })),

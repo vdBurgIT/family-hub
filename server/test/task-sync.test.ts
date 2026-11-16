@@ -333,7 +333,7 @@ test('tasks: a reset Todoist token says Reconnect; connecting it again clears it
     assert.equal(res.ok, false);
     let link = (await t.req('/api/tasks/links')).json[0];
     assert.equal(link.lastErrorCode, 'revoked');
-    assert.match(link.lastError, /^Todoist stopped letting Kinwall see this list\. Reconnect sam@example\.com/);
+    assert.match(link.lastError, /^Todoist stopped letting Family Hub see this list\. Reconnect sam@example\.com/);
     assert.equal(link.syncFailures, 1);
     await t.req('/api/tasks/accounts/todoist', 'POST', { token: 'fake-new-token-5678' }); // syncs its lists in the background
     await syncTaskLink(t.env, l.id);
@@ -353,7 +353,7 @@ test('tasks: a 429 waits out Retry-After (longer each time), and the schedule sk
     const started = Date.now();
     assert.equal((await syncTaskLink(t.env, l.id)).ok, false);
     let link = (await t.req('/api/tasks/links')).json[0];
-    assert.match(link.lastError, /asked Kinwall to slow down/);
+    assert.match(link.lastError, /asked Family Hub to slow down/);
     const wait = Date.parse(link.retryAfter) - started;
     assert.ok(wait >= 59_000 && wait < 70_000, `at least a minute (got ${wait})`);
     // Waiting: neither the schedule nor Sync now calls Todoist.
@@ -473,7 +473,7 @@ test('tasks: Google Tasks syncs title, notes, done and a due day; no priority; d
     await syncTaskLink(t.env, l.id);
     const link = (await t.req('/api/tasks/links')).json[0];
     assert.equal(link.lastErrorCode, 'revoked');
-    assert.match(link.lastError, /^Google Tasks stopped letting Kinwall see this list/);
+    assert.match(link.lastError, /^Google Tasks stopped letting Family Hub see this list/);
   } finally { t.restore(); }
 });
 

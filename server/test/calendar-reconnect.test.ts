@@ -82,10 +82,10 @@ test('calendar reconnect: a revoked Google sign-in says so in plain words, with 
     await syncCalendarTick(t.env, 'c1');
     await syncCalendarTick(t.env, 'c2');
     const leo = await t.calendar('c1');
-    assert.equal(leo.lastError, "Google stopped letting Kinwall see Leo's calendar. Reconnect it to start syncing again.");
+    assert.equal(leo.lastError, "Google stopped letting Family Hub see Leo's calendar. Reconnect it to start syncing again.");
     assert.equal(leo.lastErrorCode, 'revoked');
     assert.equal(leo.syncFailures, 1);
-    assert.equal((await t.calendar('c2')).lastError, 'Google stopped letting Kinwall see the Soccer calendar. Reconnect it to start syncing again.');
+    assert.equal((await t.calendar('c2')).lastError, 'Google stopped letting Family Hub see the Soccer calendar. Reconnect it to start syncing again.');
 
     // A passing failure isn't "revoked".
     t.setToken({ status: 503, body: '' });
@@ -111,7 +111,7 @@ test('calendar reconnect: Microsoft words it the same way', async () => {
     await t.addCalendar('c1', 'Family', [t.sam.id]);
     await syncCalendarTick(t.env, 'c1');
     const cal = await t.calendar('c1');
-    assert.equal(cal.lastError, "Microsoft stopped letting Kinwall see Sam's calendar. Reconnect it to start syncing again.");
+    assert.equal(cal.lastError, "Microsoft stopped letting Family Hub see Sam's calendar. Reconnect it to start syncing again.");
     assert.equal(cal.lastErrorCode, 'revoked');
   } finally {
     t.restore();

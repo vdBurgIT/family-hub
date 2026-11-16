@@ -1,6 +1,6 @@
 {
-  "name": "Kinwall",
-  "short_name": "Kinwall",
+  "name": "Family Hub",
+  "short_name": "Family Hub",
   "start_url": ".",
   "display": "standalone",
   "orientation": "any",

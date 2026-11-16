@@ -1,3 +1,4 @@
+import { APP_NAME } from './appName.ts'
 import { eventSpan } from './eventSpan.ts'
 import { EventFollow } from './EventFollow.tsx'
 import { AnnouncementsButton } from './FamilyAnnouncements.tsx'
@@ -378,7 +379,7 @@ export default function CalendarView({ place }: { place: 'home' | 'calendar' }) 
   const saveEvent = async (body: Partial<EventInstance>, id: string | null, seriesCategory?: { categoryId: string | null; scope: 'occurrence' | 'series' }) => {
     try {
       if (body.calendarId === NEW_LOCAL_CALENDAR) {
-        const cal = await api.createCalendar({ kind: 'local', name: 'Kinwall', color: '#F2A27A' })
+        const cal = await api.createCalendar({ kind: 'local', name: APP_NAME, color: '#F2A27A' })
         setCalendars(cs => [...cs, cal])
         body = { ...body, calendarId: cal.id }
       }

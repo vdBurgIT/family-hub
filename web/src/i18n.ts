@@ -16,6 +16,7 @@
 // No packages: the server's tests import web helpers that call t(). English ships in the code;
 // other languages load on demand (setLang), so a wall in English never downloads German.
 // scripts/i18n-check.mjs keeps en.json in step with the t() calls and checks every translation.
+import { APP_NAME } from './appName.ts'
 export type Lang = 'en' | 'de'
 /** Each choice in its own language: what someone looks for when they can't read the rest. */
 export const LANGUAGES: { key: Lang; label: string }[] = [
@@ -86,8 +87,12 @@ export const money = (cents: number): string =>
   new Intl.NumberFormat(intlLocale(), { style: 'currency', currency, ...(cents % 100 ? {} : { minimumFractionDigits: 0, maximumFractionDigits: 0 }) }).format(cents / 100)
 
 type Vars = Record<string, string | number>
+/** Family Hub: what this fork is called on screen (appName.ts). Every sentence names it through here,
+ * so the upstream copy and its translations stay as they are. Before the placeholders are filled, so
+ * a name someone typed, or "Based on {project}", keeps its own words. */
+const branded = (text: string) => text.includes('Kinwall') ? text.replace(/\bKinwall\b/g, APP_NAME) : text
 const fill = (text: string, vars?: Vars) =>
-  vars ? text.replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all)) : text
+  vars ? branded(text).replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all)) : branded(text)
 
 /** Marks English kept in a constant (a tab's label) so the check script collects it. Show it with
  * tm(label) at render. */

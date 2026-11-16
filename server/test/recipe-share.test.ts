@@ -102,7 +102,7 @@ test('recipe share: link previews (iMessage, Discord, Slack) get a title, descri
   const html = await (await request(`/r/${share.token}`, 'GET', undefined, '')).text();
   const meta = (key: string) => new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)">`).exec(html)?.[1];
   assert.equal(meta('og:type'), 'article');
-  assert.equal(meta('og:site_name'), 'Kinwall');
+  assert.equal(meta('og:site_name'), 'Family Hub');
   assert.equal(meta('og:title'), 'Tuesday Tacos');
   assert.equal(meta('og:description'), 'Beef tacos with &lt;fresh&gt; toppings &amp; warm tortillas.');
   assert.equal(meta('og:url'), share.url);

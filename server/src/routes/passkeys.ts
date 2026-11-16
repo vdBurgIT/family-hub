@@ -3,7 +3,7 @@
 // key (an api_keys row, kind='session') instead of the permanent admin key. See webauthn.ts for
 // the rpID/verify seam and SPEC.md "Security" for the key-scope model.
 import type { KinwallDb } from '../db.ts';
-import { stored, words } from '../i18n.ts';
+import { APP_NAME, stored, words } from '../i18n.ts';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createRouter } from '../router.ts';
 import type { Env } from '../env.ts';
@@ -27,7 +27,7 @@ export const passkeysRoutes = createRouter();
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const REG_TOKEN_TTL_MS = 15 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
-const RP_NAME = 'Kinwall';
+const RP_NAME = APP_NAME; // Family Hub: the name a passkey prompt shows
 const LOGIN_MAX_ATTEMPTS = 20;
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 // Single stable WebAuthn user handle: Kinwall has one admin "account", not per-person logins.

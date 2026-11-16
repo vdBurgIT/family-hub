@@ -194,7 +194,7 @@ recipeShareRoutes.openapi(createRoute({ method: 'get', path: '/r/{token}', tags:
   // Link previews (iMessage, Discord, Slack…): the photo goes through this link like the page's own.
   const summary = r.description ? (r.description.length > 200 ? `${r.description.slice(0, 199)}…` : r.description) : meta;
   const preview = [
-    ['property', 'og:type', 'article'], ['property', 'og:site_name', 'Kinwall'], ['property', 'og:title', r.name],
+    ['property', 'og:type', 'article'], ['property', 'og:site_name', 'Family Hub'], ['property', 'og:title', r.name],
     ['property', 'og:description', summary], ['property', 'og:url', self],
     ...(hero ? [['property', 'og:image', `${self}/image`]] : []),
     ['name', 'twitter:card', hero ? 'summary_large_image' : 'summary'],
