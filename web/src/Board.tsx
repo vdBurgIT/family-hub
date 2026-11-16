@@ -25,6 +25,7 @@ import { boardSources, nightFieldsFor } from './saverSources.ts'
 import { tidbitCardTitle, tidbitCards, tidbitFor, tidbitQuery, tidbitSlot, type Tidbit } from './tidbits.ts'
 import { BirthdayRow, ItemRow, dayName } from './Snapshot.tsx'
 import TodaysMeals from './TodaysMeals.tsx'
+import HomeTiles, { useHome } from './HomeCard.tsx'
 import { boardGoals } from './tempCheck.ts'
 import { TakeNowTile, useDueDoses, useTakeNowSlot } from './TakeNow.tsx'
 import Sheet from './Sheet.tsx'
@@ -432,6 +433,8 @@ export default function Board({ show, onTap, chipHost }: { show: (e: EventInstan
   })
   const tidbitAreas = ['tidbit', 'tidbit2', 'tidbit3']
 
+  // Family Hub: only a layout with the Home card asks Home Assistant (before the early return: a hook).
+  const homeState = useHome(!!layout?.columns.some(col => col.some(c => c.id === 'home')))
   if (!data) return error ? <LoadError what="the board" onRetry={() => setTick(n => n + 1)} /> : null
   const byId = new Map(members.map(m => [m.id, m]))
   const today = data.today
@@ -781,6 +784,8 @@ export default function Board({ show, onTap, chipHost }: { show: (e: EventInstan
           )}
           {chores.length === 0 && !goalsOnly.length && <p className="snap-empty">{t('No chores today.')}</p>}
         </Card>}
+
+        {has('home') && <Card title={t('Home')} area="home" density={dense('home')}><HomeTiles {...homeState} /></Card>}
 
         {has('checklist') && checklist && (() => {
           const done = checklist.itemCount - checklist.openCount, total = checklist.itemCount

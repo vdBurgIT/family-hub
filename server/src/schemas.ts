@@ -262,7 +262,7 @@ export const TidbitSettingsSchema = z
 // The Board's layouts (web/src/boardLayout.ts): columns of cards, each with how much of its column's
 // height it takes (s/m/l) and how big its text is. A family preset is one a parent saved for every
 // screen to pick; a screen's own layout stays on the device.
-export const BOARD_CARDS = ['clock', 'today', 'meals', 'photo', 'coming', 'due', 'chores', 'tidbit', 'tidbit2', 'tidbit3', 'checklist'] as const;
+export const BOARD_CARDS = ['clock', 'today', 'meals', 'photo', 'coming', 'due', 'chores', 'tidbit', 'tidbit2', 'tidbit3', 'checklist', 'home'] as const;
 export const MAX_BOARD_PRESETS = 10;
 export const BoardLayoutSchema = z
   .object({

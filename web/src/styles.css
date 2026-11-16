@@ -4231,6 +4231,20 @@ html:root[data-cast] {
 .board-custom-column > .board-card { grid-area: auto !important; }
 .board-custom-columns > .board-tiles { grid-area: auto; grid-column: 1 / -1; }
 
+/* Family Hub: the board's Home card (HomeCard.tsx). Tiles in a grid; an "on" one in the accent. */
+.home-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 8px; }
+.home-tile { width: 100%; min-height: 72px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left;
+  padding: 10px 12px; border-radius: var(--radius-sm, 12px); border: 1px solid var(--line, transparent); background: var(--bg-alt); color: var(--text); font: inherit; }
+.home-tile.on { background: color-mix(in srgb, var(--accent) 22%, var(--card)); border-color: var(--accent); }
+.home-tile:disabled { opacity: 0.7; }
+.home-tile-icon { grid-row: 1 / 3; font-size: 1.75rem; line-height: 1; }
+.home-tile-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-tile-state { font-size: 0.8125rem; color: var(--text-dim); }
+.home-pick { margin-top: 8px; min-height: 44px; }
+.home-pick-group { border: 0; padding: 0; margin: 0 0 12px; }
+.home-pick-group legend { font-weight: 800; margin-bottom: 4px; }
+.home-pick-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+
 /* ---------- Pointer and hover ----------
    Anything clickable shows a pointer; a disabled control shows not-allowed. :where() keeps this at
    zero specificity, so a component's own cursor (a grab handle, a crosshair) still wins. */
@@ -4250,7 +4264,7 @@ html:root[data-cast] {
   /* Everything else: a faint wash of the text color over its own background (darker in light, lighter in dark). */
   :where(.btn-primary, .btn-danger, .swipe-delete, .icon-btn, .fab, .today-btn, .segmented button, .tab-btn, .nav-rail-btn, .who-btn,
     .family-row, .family-pick, .board-tile, .snap-row, .shop-row, .board-empty-tap, .notif-item, .member-list-item, .cal-edit-btn,
-    .schedule-item, .month-cell, .list-item-row, .lists-section-head, .add-row-btn, .trk-book-main, .trk-visit-main, .trk-memory, .lib-book,
+    .home-tile, .schedule-item, .month-cell, .list-item-row, .lists-section-head, .add-row-btn, .trk-book-main, .trk-visit-main, .trk-memory, .lib-book,
     .activity-card, .chore-card-edit, .list-card-edit, button.plugin-chore-chip, .recipe-step, .menu-pick, .order-tick, .order-row, .note, .more-row, .setup-chore-tap, .board-poll-btn, .board-slot-row, .board-slot-chip, a.board-slot-full, button.board-slot-full, .board-slot-head-link, .catalog-row-main, .paint-btn, .paint-brush-tile, .paint-stamp, .paint-size, .settings-acc-btn, button.profile-bonus-row, .toast-action, .outing-pile-head, .outing-pile-item):not(:disabled, .active):hover {
     background-image: linear-gradient(color-mix(in srgb, var(--text) 8%, transparent) 0 0);
   }

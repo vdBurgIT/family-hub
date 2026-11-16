@@ -6,12 +6,12 @@ import { msg } from './i18n.ts'
 // or its own layout kept on the device. Pure, so web/test/boardLayout.test.ts covers it. The server
 // checks family presets against the same shape (server/src/schemas.ts BoardLayoutSchema).
 
-export const BOARD_CARDS = ['clock', 'today', 'meals', 'photo', 'coming', 'due', 'chores', 'tidbit', 'tidbit2', 'tidbit3', 'checklist'] as const
+export const BOARD_CARDS = ['clock', 'today', 'meals', 'photo', 'coming', 'due', 'chores', 'tidbit', 'tidbit2', 'tidbit3', 'checklist', 'home'] as const
 export type BoardCardId = typeof BOARD_CARDS[number]
 export const CARD_NAMES: Record<BoardCardId, string> = {
   clock: msg('Clock & weather'), today: msg('Today'), meals: msg('Today’s meals'), photo: msg('Picture'), coming: msg('Coming up'),
   due: msg('Due soon'), chores: msg('Chores today'), tidbit: msg('Quote or fact'), tidbit2: msg('Quote or fact 2'), tidbit3: msg('Quote or fact 3'),
-  checklist: msg('Get stuff done'),
+  checklist: msg('Get stuff done'), home: msg('Home'),
 }
 export const CARD_SIZES = ['s', 'm', 'l'] as const
 export type CardSize = typeof CARD_SIZES[number]

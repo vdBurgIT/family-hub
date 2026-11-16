@@ -141,6 +141,8 @@ const env: Env = {
   ALLOW_PRIVATE_FEED_URLS: process.env.ALLOW_PRIVATE_FEED_URLS,
   ALLOW_PRIVATE_WEBHOOK_URLS: process.env.ALLOW_PRIVATE_WEBHOOK_URLS,
   PERSON_CALENDARS: process.env.PERSON_CALENDARS,
+  HA_URL: process.env.HA_URL,
+  HA_TOKEN: process.env.HA_TOKEN,
   PHOTO_FOLDER: process.env.PHOTO_FOLDER ? photoFolder(process.env.PHOTO_FOLDER) : undefined,
   OUTBOUND_FETCH: nodeFetch(guardedLookup()), // person-supplied URLs: refuse names that resolve to private addresses
   WEBAUTHN_RP_ID: process.env.WEBAUTHN_RP_ID,

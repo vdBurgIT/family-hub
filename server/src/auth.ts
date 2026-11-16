@@ -202,6 +202,8 @@ const PUBLIC_PATH =
 // listed here is denied for display keys - deny by default, not scattered checks.
 const DISPLAY_ALLOWED: { method: string; pattern: RegExp }[] = [
   { method: 'GET', pattern: /^\/api\/announcements$/ },
+  { method: 'GET', pattern: /^\/api\/home$/ }, // Family Hub: the board's Home card
+  { method: 'POST', pattern: /^\/api\/home\/[a-z_]+\.[a-z0-9_]+\/toggle$/ }, // switch a tile a parent put on the board
   { method: 'PUT', pattern: /^\/api\/push\/(native|android)$/ },
   { method: 'GET', pattern: /^\/api\/recipes(\/[^/]+)?$/ },
   { method: 'PUT', pattern: /^\/api\/recipes\/[^/]+\/(rating|favorite)$/ }, // family members rate and heart dinners (a member's own device only for them)

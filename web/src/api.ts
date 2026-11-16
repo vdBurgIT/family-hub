@@ -31,6 +31,10 @@ import type { ActivityChoreProgress, OnlineTidbits, Plugin, PluginActionItem, Pl
 const milestonePath = (id?: string) => ['api', 'reward-milestones', ...(id ? [encodeURIComponent(id)] : [])].join('/')
 const demoFollows = new Map<string,{enabled:boolean;minutes:number;scope:'occurrence'|'series'}>()
 export const MOCK = import.meta.env.VITE_MOCK === '1'
+export type HomeDomain = 'light' | 'switch' | 'fan' | 'input_boolean' | 'scene' | 'script' | 'cover' | 'lock'
+export interface HomeTile { entityId: string; name: string; domain: HomeDomain; state: string; on: boolean; brightness: number | null }
+export interface HomeInfo { configured: boolean; tiles: HomeTile[]; error: string | null }
+export interface HomeEntity { entityId: string; name: string; domain: HomeDomain; state: string }
 doseChanges.listen(tellAppDoseChanged)
 /** This device's push subscription id (Settings → This display → Notifications), for its own prefs. */
 export const PUSH_SUB_ID_KEY = 'kinwall.pushSubId'
@@ -348,6 +352,11 @@ const qs = (q: Record<string, string | undefined>) => { const p = new URLSearchP
 const routinePath = (id: string) => ['api', 'routine-mode', U(id)].join('/')
 
 export const api = {
+  // Family Hub: Home Assistant tiles on the board (server/src/routes/home.ts). The demo has no house.
+  getHome: () => MOCK ? Promise.resolve<HomeInfo>({ configured: false, tiles: [], error: null }) : get<HomeInfo>('api/home'),
+  toggleHome: (entityId: string) => post<HomeTile>(`api/home/${encodeURIComponent(entityId)}/toggle`),
+  getHomeEntities: () => get<HomeEntity[]>('api/home/entities'),
+  setHomeTiles: (entityIds: string[]) => put<{ entityIds: string[] }>('api/home/tiles', { entityIds }),
   getWeeklyPlanning: (weekStart?: string) => get<WeeklyPlanning>('api/weekly-plan' + qs({ weekStart })),
   saveWeeklyDraft: (weekStart: string, revision: number, draft: PlanningDraft) => put<WeeklyPlanning>('api/weekly-plan/' + encodeURIComponent(weekStart), { revision, draft }),
   applyWeeklyPlan: (weekStart: string, input: { revision: number; sourceVersion: number; requestId: string; draft: PlanningDraft }) => post<WeeklyPlanning>('api/weekly-plan/' + encodeURIComponent(weekStart) + '/apply', input),

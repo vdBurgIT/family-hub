@@ -32,6 +32,8 @@ export type Env = NativePushEnv & FcmEnv & {
   CLIENT_IP?: (req: Request) => string | null; // the caller's address for per-address rate limits (node.ts: socket peer, X-Forwarded-For only with TRUST_PROXY=1). Unset: cf-connecting-ip, which Cloudflare hosts always set; see ratelimit.ts
   ALLOW_PRIVATE_FEED_URLS?: string; // '1' lets ICS/CalDAV reach LAN hosts (see outbound.ts)
   ALLOW_PRIVATE_WEBHOOK_URLS?: string; // '1' lets webhooks target LAN receivers (Home Assistant add-on sets it)
+  HA_URL?: string; // Family Hub: Home Assistant for the board's Home card, e.g. http://192.168.0.98:8123
+  HA_TOKEN?: string; // its long-lived access token (a non-admin HA user); never sent to a browser
   PERSON_CALENDARS?: string; // Family Hub: '1' puts an event in the own calendar of each person it's for (person-calendars.ts)
   PHOTO_FOLDER?: PhotoFolder; // pictures in a folder on the server for the Night screen and the Board (node.ts: PHOTO_FOLDER=/photos, photo-folder-node.ts). Unset (Workers): none
   OUTBOUND_FETCH?: Fetch; // a fetch that refuses private addresses at connect time, for person-supplied URLs (node.ts: outbound-node.ts). Unset (Workers): the literal-host check only; see outbound.ts
