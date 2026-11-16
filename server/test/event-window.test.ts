@@ -138,7 +138,7 @@ test('a notification tick reads the events once, near now', async () => {
   assert.ok(n.rows < 40, `read ${n.rows} event rows`);
 });
 
-const GOLDEN = '6579:1acc465ef3e398c4'; // captured from the whole-table read (re-captured when instances gained busy, then meal; same rows otherwise)
+const GOLDEN = '6579:48ea7bd03a68abe4'; // captured from the whole-table read (re-captured when instances gained busy, then meal, then seriesRrule; same rows otherwise)
 
 function withOldDetails() {
   const raw = seed();

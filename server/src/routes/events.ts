@@ -13,6 +13,7 @@ import { errorMessage } from '../redact.ts';
 import { hostTimezone } from '../env.ts';
 import { ErrorSchema, EventInputSchema, EventInstanceSchema } from '../schemas.ts';
 import { deterministicEventId } from '../event-id.ts';
+import { syncCalendar } from '../sync.ts';
 import { parseMemberIds } from '../calendar-members.ts';
 import { matchCategoryByKeyword, type CategoryRow } from '../calendar-categories.ts';
 import { eventWriteBlock, requestKey } from '../auth.ts';
@@ -41,6 +42,7 @@ type EventRow = {
   travel_minutes: number | null;
   remind_before_leave: number;
   busy: number; // 1 busy (default), 0 free - migration 0073
+  series_rrule?: string | null; // a synced CalDAV occurrence's series rule - migration 0150
 };
 
 type CalendarRow = {
@@ -414,6 +416,7 @@ function instanceFrom(
     occurrenceStart,
     readOnly: !cal.writable,
     seriesId: row.series_id,
+    seriesRrule: cal.kind === 'local' ? null : (row.series_rrule ?? null),
     memberScope,
     categoryId,
     categorySource,
@@ -712,7 +715,10 @@ export async function createEvent(c: Ctx, body: z.infer<typeof EventInputSchema>
   let location = body.location ?? null;
   let description = body.description || null;
   let seriesId: string | null = null;
+  let seriesRrule: string | null = null;
   let busy = body.busy ?? true;
+  // CalDAV writes the repeat into the event there (Google and Outlook don't take one from Kinwall yet).
+  const remoteRrule = cal.kind === 'caldav' ? (body.rrule ?? null) : null;
 
   if (cal.kind !== 'local') {
     const provider = getProvider(cal.kind as 'ics' | 'google' | 'microsoft' | 'caldav');
@@ -728,7 +734,7 @@ export async function createEvent(c: Ctx, body: z.infer<typeof EventInputSchema>
         description: description ?? undefined,
         ...(body.reminders !== undefined ? { reminders: body.reminders } : {}),
         ...(body.busy !== undefined ? { busy: body.busy } : {}),
-      });
+      }, remoteRrule ? { rrule: remoteRrule } : undefined);
       externalId = created.externalId;
       title = created.title;
       start = created.start;
@@ -736,6 +742,7 @@ export async function createEvent(c: Ctx, body: z.infer<typeof EventInputSchema>
       location = created.location ?? null;
       description = created.description || null;
       seriesId = created.seriesId ?? null;
+      seriesRrule = created.seriesRrule ?? null;
       if (created.busy !== undefined) busy = created.busy;
     } catch (err) {
       return providerFail(c, err);
@@ -764,18 +771,21 @@ export async function createEvent(c: Ctx, body: z.infer<typeof EventInputSchema>
     travel_minutes: body.travelMinutes ?? null,
     remind_before_leave: body.remindBeforeLeave ? 1 : 0,
     busy: busy ? 1 : 0,
+    series_rrule: seriesRrule,
   };
   // Synced rows are wiped on resync, so their travel time goes to the override table (the row's
   // own columns stay empty, like sync writes them).
   const local = cal.kind === 'local';
   await c.env.DB.prepare(
-    'INSERT INTO events (id, calendar_id, external_id, title, start, end, all_day, location, description, rrule, member_ids, updated_at, series_id, category_id, reminders, travel_minutes, remind_before_leave, busy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO events (id, calendar_id, external_id, title, start, end, all_day, location, description, rrule, member_ids, updated_at, series_id, category_id, reminders, travel_minutes, remind_before_leave, busy, series_rrule) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
   )
-    .bind(row.id, row.calendar_id, row.external_id, row.title, row.start, row.end, row.all_day, row.location, row.description, row.rrule, row.member_ids, row.updated_at, row.series_id, row.category_id, row.reminders, local ? row.travel_minutes : null, local ? row.remind_before_leave : 0, row.busy)
+    .bind(row.id, row.calendar_id, row.external_id, row.title, row.start, row.end, row.all_day, row.location, row.description, row.rrule, row.member_ids, row.updated_at, row.series_id, row.category_id, row.reminders, local ? row.travel_minutes : null, local ? row.remind_before_leave : 0, row.busy, row.series_rrule)
     .run();
   if (!local && externalId && (row.travel_minutes !== null || row.remind_before_leave)) await setTravelOverride(c.env.DB, cal.id, externalId, row.travel_minutes, !!row.remind_before_leave);
   // Like travel time, people on a synced event live in the override table - a full sync rewrites the row.
   if (!local && externalId && body.memberIds?.length) await setMemberOverride(c.env.DB, cal.id, externalId, body.memberIds);
+  // The rest of a new repeat's occurrences come from the calendar itself: sync it now, not on the next tick.
+  if (remoteRrule) await syncCalendar(c.env, cal.id);
   emit(c, 'events.changed', { calendarId: cal.id });
   return { row, cal };
 }
@@ -878,7 +888,11 @@ eventsRoutes.openapi(
 
 const EventPatchSchema = EventInputSchema.omit({ calendarId: true })
   .partial()
-  .extend({ scope: z.enum(['occurrence', 'series']).optional() })
+  .extend({
+    scope: z.enum(['occurrence', 'series']).optional().openapi({
+      description: "A repeating synced event: 'occurrence' (the default) changes just this one, 'series' every one in its series. On CalDAV it applies to the event itself (times, title, repeat); on any calendar to people and category. A Kinwall calendar's repeat is one event: its changes are always the whole series",
+    }),
+  })
   .openapi('EventPatch');
 
 eventsRoutes.openapi(
@@ -954,6 +968,14 @@ export async function updateEvent(c: Ctx, id: string, body: z.infer<typeof Event
 
   let remoteReminders: string | null | undefined;
   let busy = body.busy !== undefined ? (body.busy ? 1 : 0) : row.busy;
+  // CalDAV: one occurrence of a repeat, or its whole series (the safe one, an occurrence, unless asked).
+  // The repeat itself belongs to the series: a changed rule goes with 'series' (or a single event
+  // that starts repeating). A series-wide change moves other occurrences too, so the calendar is
+  // read back in full afterwards instead of patching rows here.
+  const scope = body.scope ?? 'occurrence';
+  const caldavRrule = cal.kind === 'caldav' && body.rrule !== undefined && (body.rrule ?? null) !== (row.series_rrule ?? null) && (scope === 'series' || !row.series_id) ? body.rrule : undefined;
+  const resync = cal.kind === 'caldav' && otherFieldsPresent && ((scope === 'series' && !!row.series_id) || caldavRrule !== undefined);
+  let newExternalId = row.external_id;
   if (cal.kind !== 'local' && otherFieldsPresent) {
     const provider = getProvider(cal.kind as 'ics' | 'google' | 'microsoft' | 'caldav');
     if (!provider.updateEvent || !row.external_id) return { error: `${cal.kind} calendars are read-only`, status: 400 };
@@ -971,7 +993,8 @@ export async function updateEvent(c: Ctx, id: string, body: z.infer<typeof Event
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.reminders !== undefined ? { reminders: body.reminders } : {}),
         ...(body.busy !== undefined ? { busy: body.busy } : {}),
-      });
+      }, { scope, ...(caldavRrule !== undefined ? { rrule: caldavRrule } : {}) });
+      newExternalId = updated.externalId || row.external_id;
       if (updated.busy !== undefined && body.busy !== undefined) busy = updated.busy ? 1 : 0;
       if (body.reminders !== undefined) remoteReminders = Array.isArray(updated.reminders) ? JSON.stringify(updated.reminders) : null;
       title = updated.title;
@@ -985,7 +1008,6 @@ export async function updateEvent(c: Ctx, id: string, body: z.infer<typeof Event
   }
 
   if (cal.kind !== 'local' && body.memberIds !== undefined) {
-    const scope = body.scope ?? 'occurrence';
     if (scope === 'series') {
       if (!row.series_id) return { error: 'event has no series to tag', status: 400 };
       await setSeriesMemberOverride(c.env.DB, cal.id, row.series_id, body.memberIds);
@@ -997,7 +1019,6 @@ export async function updateEvent(c: Ctx, id: string, body: z.infer<typeof Event
   }
 
   if (cal.kind !== 'local' && body.categoryId !== undefined) {
-    const scope = body.scope ?? 'occurrence';
     if (scope === 'series') {
       if (!row.series_id) return { error: 'event has no series to tag', status: 400 };
       await setSeriesCategoryOverride(c.env.DB, cal.id, row.series_id, body.categoryId);
@@ -1017,6 +1038,15 @@ export async function updateEvent(c: Ctx, id: string, body: z.infer<typeof Event
     travelMinutes = body.travelMinutes !== undefined ? body.travelMinutes : current.travel_minutes;
     remindBeforeLeave = body.remindBeforeLeave !== undefined ? (body.remindBeforeLeave ? 1 : 0) : current.remind_before_leave;
     if (cal.kind !== 'local') await setTravelOverride(c.env.DB, cal.id, row.external_id!, travelMinutes, !!remindBeforeLeave);
+  }
+
+  if (resync) {
+    await syncCalendar(c.env, cal.id);
+    // The occurrence that was edited, as sync stored it (its id follows its new time).
+    const fresh = newExternalId ? await loadEventAndCalendar(c.env.DB, await deterministicEventId(cal.id, newExternalId)) : null;
+    emit(c, 'events.changed', { calendarId: cal.id });
+    if (fresh) return { row: fresh.row, cal };
+    return { row: { ...row, title, start, end, all_day: body.allDay !== undefined ? (body.allDay ? 1 : 0) : row.all_day, location, description, busy }, cal };
   }
 
   const updatedRow: EventRow = {
@@ -1083,7 +1113,14 @@ eventsRoutes.openapi(
     tags: ['Events'],
     summary: 'Delete an event (whole series, for local recurring events)',
     security: [{ Bearer: [] }],
-    request: { params: z.object({ id: z.string() }) },
+    request: {
+      params: z.object({ id: z.string() }),
+      query: z.object({
+        scope: z.enum(['occurrence', 'series']).optional().openapi({
+          description: "A repeating CalDAV event: 'occurrence' (the default) deletes just this one, 'series' every one in its series. A Kinwall calendar's repeat is always deleted whole",
+        }),
+      }),
+    },
     responses: {
       200: { description: 'ok', content: { 'application/json': { schema: z.object({ ok: z.boolean() }) } } },
       400: { description: 'invalid', content: { 'application/json': { schema: ErrorSchema } } },
@@ -1094,13 +1131,13 @@ eventsRoutes.openapi(
   }),
   async (c) => {
     if (await hiddenFromDisplay(c, c.req.valid('param').id)) return c.json({ error: 'not found' }, 404);
-    const deleted = await deleteEvent(c, c.req.valid('param').id);
+    const deleted = await deleteEvent(c, c.req.valid('param').id, c.req.valid('query').scope);
     return 'error' in deleted ? c.json({ error: deleted.error }, deleted.status) : c.json({ ok: true }, 200);
   },
 );
 
 /** DELETE /api/events/{id} (also how deleting a meal removes the event it created). */
-export async function deleteEvent(c: Ctx, id: string): Promise<Fail<400 | 403 | 404 | 502> | { ok: true }> {
+export async function deleteEvent(c: Ctx, id: string, scope: 'occurrence' | 'series' = 'occurrence'): Promise<Fail<400 | 403 | 404 | 502> | { ok: true }> {
   const found = await loadEventAndCalendar(c.env.DB, id);
   if (!found) return { error: 'not found', status: 404 };
   const { row, cal } = found;
@@ -1112,7 +1149,7 @@ export async function deleteEvent(c: Ctx, id: string): Promise<Fail<400 | 403 | 
     if (!provider.deleteEvent || !row.external_id) return { error: `${cal.kind} calendars are read-only`, status: 400 };
     const ctx = await buildCtx(c.env.DB, cal, c.env);
     try {
-      await provider.deleteEvent(ctx, row.external_id);
+      await provider.deleteEvent(ctx, row.external_id, { scope });
     } catch (err) {
       return providerFail(c, err);
     }
@@ -1122,6 +1159,8 @@ export async function deleteEvent(c: Ctx, id: string): Promise<Fail<400 | 403 | 
   // notes - they come back if the event does).
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM events WHERE id = ?').bind(id),
+    // A deleted CalDAV series takes its other occurrences along now, not at the next sync.
+    ...(cal.kind === 'caldav' && scope === 'series' && row.series_id ? [c.env.DB.prepare('DELETE FROM events WHERE calendar_id = ? AND series_id = ?').bind(cal.id, row.series_id)] : []),
     c.env.DB.prepare("DELETE FROM notes WHERE target_type = 'event' AND target_id = ?").bind(id),
     c.env.DB.prepare('UPDATE meals SET calendar_event_id = NULL, calendar_event_start = NULL, updated_at = ? WHERE calendar_event_id = ?').bind(new Date().toISOString(), id),
     c.env.DB.prepare('UPDATE outings SET calendar_event_id = NULL, updated_at = ? WHERE calendar_event_id = ?').bind(new Date().toISOString(), id),

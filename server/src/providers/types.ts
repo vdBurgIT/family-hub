@@ -21,9 +21,23 @@ export type NormalizedEvent = {
   busy?: boolean;
   // STATUS:CANCELLED, only when expandICS was asked to keep those (Outings' community calendars).
   cancelled?: boolean;
+  // The series' repeat rule (RRULE value, no "RRULE:"), on each occurrence of a repeating CalDAV
+  // event, so the event sheet can show and edit it. Synced rows are already expanded: this is
+  // never expanded again (routes/events.ts expands only a Kinwall calendar's own rrule).
+  seriesRrule?: string;
 };
 
 export type EventInput = Omit<NormalizedEvent, 'externalId'>;
+
+/** Writes to one occurrence of a repeating event: just that one, or every one in its series.
+ * CalDAV honors it; Google and Outlook edit the occurrence they're given. */
+export type WriteScope = 'occurrence' | 'series';
+export type WriteOptions = {
+  scope?: WriteScope;
+  // CalDAV: a string sets the series' repeat rule (scope 'series', or a single event that starts
+  // repeating), null ends it. Kinwall calendars keep theirs on the row instead.
+  rrule?: string | null;
+};
 
 export type RemoteCalendar = { remoteId: string; name: string; color?: string; writable: boolean };
 
@@ -52,9 +66,9 @@ export type ProviderCtx = {
 export interface Provider {
   listCalendars?(ctx: Omit<ProviderCtx, 'calendar'>): Promise<RemoteCalendar[]>;
   listEvents(ctx: ProviderCtx, from: Date, to: Date): Promise<NormalizedEvent[]>; // recurrence expanded
-  createEvent?(ctx: ProviderCtx, ev: EventInput): Promise<NormalizedEvent>;
-  updateEvent?(ctx: ProviderCtx, externalId: string, ev: Partial<EventInput>): Promise<NormalizedEvent>;
-  deleteEvent?(ctx: ProviderCtx, externalId: string): Promise<void>;
+  createEvent?(ctx: ProviderCtx, ev: EventInput, opts?: { rrule?: string | null }): Promise<NormalizedEvent>;
+  updateEvent?(ctx: ProviderCtx, externalId: string, ev: Partial<EventInput>, opts?: WriteOptions): Promise<NormalizedEvent>;
+  deleteEvent?(ctx: ProviderCtx, externalId: string, opts?: { scope?: WriteScope }): Promise<void>;
 }
 
 // google.ts and microsoft.ts additionally export (PKCE, S256):
