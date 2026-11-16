@@ -19,10 +19,11 @@ import { eventWriteBlock, requestKey } from '../auth.ts';
 import { defaultCalendarId } from '../default-calendar.ts';
 import { filterActive, filterShows, parseFilter } from '../calendar-filter.ts';
 import { mealLinksQuery, parseMealLinks, prepAt } from '../prepBy.ts';
+import { copiesOf, personCalendarsOn, placeForPeople } from '../person-calendars.ts';
 
 export const eventsRoutes = createRouter();
 
-type EventRow = {
+export type EventRow = {
   id: string;
   calendar_id: string;
   external_id: string | null;
@@ -43,7 +44,7 @@ type EventRow = {
   busy: number; // 1 busy (default), 0 free - migration 0073
 };
 
-type CalendarRow = {
+export type CalendarRow = {
   id: string;
   kind: string;
   account_id: string | null;
@@ -91,7 +92,7 @@ function buildOverrideMap(rows: OverrideRow[]): Map<string, string[]> {
 
 // '[]' clears the override (falls back to the calendar member again) rather than storing an
 // empty array forever.
-async function setMemberOverride(db: KinwallDb, calendarId: string, externalId: string, memberIds: string[]): Promise<void> {
+export async function setMemberOverride(db: KinwallDb, calendarId: string, externalId: string, memberIds: string[]): Promise<void> {
   if (memberIds.length === 0) {
     await db.prepare('DELETE FROM event_member_overrides WHERE calendar_id = ? AND external_id = ?').bind(calendarId, externalId).run();
     return;
@@ -648,13 +649,24 @@ eventsRoutes.openapi(
       201: { description: 'created', content: { 'application/json': { schema: EventInstanceSchema } } },
       400: { description: 'invalid', content: { 'application/json': { schema: ErrorSchema } } },
       403: { description: "this device may not change events on that calendar", content: { 'application/json': { schema: ErrorSchema } } },
+      404: { description: 'the new event went missing while it was put in its people\'s calendars', content: { 'application/json': { schema: ErrorSchema } } },
       502: { description: 'provider write failed', content: { 'application/json': { schema: ErrorSchema } } },
     },
   }),
   async (c) => {
-    const created = await createEvent(c, c.req.valid('json'));
+    const input = c.req.valid('json');
+    const created = await createEvent(c, input);
     if ('error' in created) return c.json({ error: created.error }, created.status);
-    const { row, cal } = created;
+    let { row, cal } = created;
+    // Family Hub: into the own calendar of each person it's for (person-calendars.ts).
+    if (input.memberIds?.length) {
+      const placed = await placeForPeople(c, row.id, input.memberIds);
+      if (placed && 'error' in placed) return c.json({ error: placed.error }, placed.status);
+      if (placed) {
+        const now = await loadEventAndCalendar(c.env.DB, placed.id);
+        if (now) ({ row, cal } = now);
+      }
+    }
     const { memberColors, categories, defaultReminderMinutes } = await colorsAndCategories(c.env.DB);
     const { seriesOverride, categorySeriesOverride } = await remoteOverrides(c.env.DB, cal, null, row.series_id);
     return c.json(instanceFrom(row, cal, memberColors, null, row.start, row.end, undefined, seriesOverride, categories, undefined, categorySeriesOverride, defaultReminderMinutes), 201);
@@ -796,7 +808,7 @@ type EventCalRow = EventRow & {
 };
 
 // Event + its calendar in one round trip (join) instead of two sequential lookups.
-async function loadEventAndCalendar(db: KinwallDb, id: string): Promise<{ row: EventRow; cal: CalendarRow } | null> {
+export async function loadEventAndCalendar(db: KinwallDb, id: string): Promise<{ row: EventRow; cal: CalendarRow } | null> {
   const joined = await db
     .prepare(
       `SELECT e.*, c.kind AS cal_kind, c.account_id AS cal_account_id, c.remote_id AS cal_remote_id, c.name AS cal_name,
@@ -899,8 +911,34 @@ eventsRoutes.openapi(
   }),
   async (c) => {
     if (await hiddenFromDisplay(c, c.req.valid('param').id)) return c.json({ error: 'not found' }, 404);
-    const updated = await updateEvent(c, c.req.valid('param').id, c.req.valid('json'));
+    const id = c.req.valid('param').id;
+    const body = c.req.valid('json');
+    // Family Hub: its copies in other people's calendars change with it, and who it's for decides
+    // which calendars hold it (person-calendars.ts).
+    const before = personCalendarsOn(c.env) ? await loadEventAndCalendar(c.env.DB, id) : null;
+    const siblings = before ? (await copiesOf(c.env.DB, before.row)).filter((r) => r.id !== id) : [];
+    const placing = body.memberIds !== undefined && !!before && !before.row.rrule && !before.row.series_id;
+    const fields = { ...body, memberIds: placing ? undefined : body.memberIds };
+    let updated = await updateEvent(c, id, fields);
     if ('error' in updated) return c.json({ error: updated.error }, updated.status);
+    const { memberIds: _people, categoryId: _category, travelMinutes: _travel, remindBeforeLeave: _leave, scope: _scope, ...shared } = fields;
+    if (Object.values(shared).some((v) => v !== undefined)) {
+      for (const sib of siblings) {
+        const done = await updateEvent(c, sib.id, shared);
+        if ('error' in done) console.error('copy not updated', sib.id, done.error);
+      }
+    }
+    if (placing) {
+      const placed = await placeForPeople(c, id, body.memberIds!);
+      if (placed && 'error' in placed) return c.json({ error: placed.error }, placed.status);
+      if (placed) {
+        const now = await loadEventAndCalendar(c.env.DB, placed.id);
+        if (now) updated = { ...now, lookups: updated.lookups };
+      } else {
+        updated = await updateEvent(c, id, { memberIds: body.memberIds, scope: body.scope });
+        if ('error' in updated) return c.json({ error: updated.error }, updated.status);
+      }
+    }
     const { row: updatedRow, cal } = updated;
     const { memberColors, categories, defaultReminderMinutes } = updated.lookups ?? await colorsAndCategories(c.env.DB);
     const { override, seriesOverride, categoryOverride, categorySeriesOverride, travel } = await remoteOverrides(c.env.DB, cal, updatedRow.external_id, updatedRow.series_id);
@@ -1094,7 +1132,17 @@ eventsRoutes.openapi(
   }),
   async (c) => {
     if (await hiddenFromDisplay(c, c.req.valid('param').id)) return c.json({ error: 'not found' }, 404);
-    const deleted = await deleteEvent(c, c.req.valid('param').id);
+    const id = c.req.valid('param').id;
+    // Family Hub: an event for several people goes from each of their calendars (person-calendars.ts).
+    const before = personCalendarsOn(c.env) ? await loadEventAndCalendar(c.env.DB, id) : null;
+    const siblings = before ? (await copiesOf(c.env.DB, before.row)).filter((r) => r.id !== id) : [];
+    const deleted = await deleteEvent(c, id);
+    if (!('error' in deleted)) {
+      for (const sib of siblings) {
+        const gone = await deleteEvent(c, sib.id);
+        if ('error' in gone) console.error('copy not deleted', sib.id, gone.error);
+      }
+    }
     return 'error' in deleted ? c.json({ error: deleted.error }, deleted.status) : c.json({ ok: true }, 200);
   },
 );
